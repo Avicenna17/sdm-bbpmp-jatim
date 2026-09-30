@@ -1,0 +1,10 @@
+<article class="portal-card min-w-0">
+    <h3 class="font-bold text-slate-900">{{ $title }}</h3>
+    @if(!$values || collect($values)->whereNotNull('value')->isEmpty())
+        <div class="h-52 grid place-content-center text-sm text-slate-500">Tidak ada data untuk pilihan ini.</div>
+    @else
+        @php($chartValues = array_map(fn ($v) => ['label'=>$showLabel($v['label']),'value'=>$v['value']], $values))
+        <div class="overflow-y-auto mt-4" style="max-height:360px"><div style="position:relative;height:{{ $horizontal ? max(280,count($values)*32) : 280 }}px"><canvas id="{{ $chartId }}" data-public-chart data-chart-type="{{ $type }}" data-horizontal="{{ $horizontal ? 'true':'false' }}" data-values="{{ json_encode($chartValues,JSON_THROW_ON_ERROR) }}" aria-label="{{ $title }}" role="img"></canvas></div></div>
+    @endif
+    <details class="mt-4 border-t border-slate-100 pt-3"><summary class="text-xs font-semibold text-blue-900 cursor-pointer">Lihat angka dan keterangan</summary><div class="max-h-56 overflow-auto"><table class="w-full text-xs mt-3"><tbody>@forelse($values as $item)<tr class="border-b border-slate-100"><th class="text-left py-2 font-medium">{{ $showLabel($item['label']) }}</th><td class="text-right py-2">{{ $item['value']??'-' }}@if(isset($item['known']) && $item['known'] < $item['expected'])<small class="block text-amber-700">Data tersedia {{ $item['known'] }}/{{ $item['expected'] }} jabatan; total sementara</small>@endif</td></tr>@empty<tr><td>Belum ada data.</td></tr>@endforelse</tbody></table></div></details>
+</article>
