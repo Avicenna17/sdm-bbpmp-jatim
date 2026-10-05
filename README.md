@@ -99,3 +99,7 @@ pnpm run build
 Sertakan hasil `public/build` saat deployment. Setelah mengubah Blade/CSS/JavaScript, jalankan build kembali. Lockfile disertakan agar versi dependensi konsisten.
 
 Filter kepegawaian memengaruhi total dan grafik pegawai. Filter pencarian/jenis jabatan memengaruhi ringkasan formasi, proyeksi tahunan, dan tabel peta jabatan; keduanya berbagi periode. Kolom tahunan mengikuti data import, nilai kosong tidak diubah menjadi nol, dan data parsial ditandai pada rincian angka. Dashboard publik tidak mengirim nama/NIP, file sumber, atau data periode draft.
+
+## Template Import
+
+Pengelolaan versi, editor kolom, preview, uji contoh file, serta pemetaan import dijelaskan pada [panduan Template Import](docs/TEMPLATE-IMPORT.md). Setelah memperbarui kode, jalankan migrasi sebelum membuka menu baru.

@@ -37,6 +37,7 @@
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8" aria-labelledby="filter-heading">
         <h2 id="filter-heading" class="text-xl font-bold text-slate-900 mb-4">Filter data kepegawaian</h2>
         <form method="get" action="{{ route('dashboard') }}" class="portal-card" data-dashboard-filter>
+            <input type="hidden" name="period" value="{{ $period->period_month->format('Y-m') }}">
             @foreach(['position_search','position_type'] as $field)@if(filled($filters[$field]??null))<input type="hidden" name="{{ $field }}" value="{{ $filters[$field] }}">@endif@endforeach
             <div class="flex flex-wrap items-end gap-5">
                 <fieldset><legend class="text-xs font-semibold text-slate-600 mb-2">Kelompok pegawai</legend><div class="flex gap-2">@foreach(['ASN','PPNPN'] as $group)<label class="portal-segment"><input type="radio" data-auto-filter name="employment_group" value="{{ $group }}" @checked($filters['employment_group']===$group)><span>{{ $group }}</span></label>@endforeach</div></fieldset>

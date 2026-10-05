@@ -10,6 +10,8 @@ use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Models\Role;
 
 class RoleResource extends Resource
@@ -26,7 +28,7 @@ class RoleResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->can('role.manage') ?? false;
+        return Gate::allows('role.manage');
     }
 
     public static function canCreate(): bool
@@ -34,12 +36,12 @@ class RoleResource extends Resource
         return static::canViewAny();
     }
 
-    public static function canEdit($record): bool
+    public static function canEdit(Model $record): bool
     {
         return static::canViewAny() && $record->name !== 'Super Admin';
     }
 
-    public static function canDelete($record): bool
+    public static function canDelete(Model $record): bool
     {
         return false;
     }
