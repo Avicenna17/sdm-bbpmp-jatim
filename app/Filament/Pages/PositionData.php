@@ -11,6 +11,7 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Gate;
 
 class PositionData extends Page implements HasTable
 {
@@ -48,7 +49,7 @@ class PositionData extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->can('position_requirement.view') ?? false;
+        return Gate::allows('position_requirement.view');
     }
 
     public function table(Table $table): Table
@@ -70,6 +71,8 @@ class PositionData extends Page implements HasTable
         foreach (['position_type' => 'Jenis Jabatan', 'position_class' => 'Kelas', 'requirement_status' => 'Status'] as $field => $label) {
             $filters[] = SelectFilter::make($field)->label($label)->options(fn () => PositionRequirementSnapshot::whereNotNull($field)->distinct()->pluck($field, $field)->all());
         }
+
+        $columns[] = TextColumn::make('extra_data')->label('Data tambahan')->getStateUsing(fn ($record) => collect($record->extra_data ?? [])->map(fn ($item) => $item['label'].': '.($item['value'] ?? '-'))->values()->all())->listWithLineBreaks()->wrap()->toggleable();
 
         return $table->query(PositionRequirementSnapshot::query()->with(['period', 'projections']))->columns($columns)->filters($filters)->deferFilters(false)->defaultSort('vacancy_count', 'desc')->emptyStateHeading('Belum ada peta jabatan');
     }

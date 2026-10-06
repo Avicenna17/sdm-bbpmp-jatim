@@ -1,28 +1,81 @@
 import Chart from 'chart.js/auto';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
+
+Chart.register(ChartDataLabels);
 
 const colors = ['#2563eb', '#facc15', '#93c5fd', '#fde68a', '#1e3a8a', '#ca8a04', '#64748b'];
 function renderCharts() {
-for (const canvas of document.querySelectorAll('[data-public-chart]')) {
-    const values = JSON.parse(canvas.dataset.values);
-    const type = canvas.dataset.chartType;
-    const barColor = canvas.id === 'projection-RETIREMENT' ? '#ef4444' : canvas.id === 'projection-REQUIREMENT' ? '#16a34a' : '#2563eb';
-    const horizontal = canvas.dataset.horizontal === 'true';
-    new Chart(canvas, {
-        type,
-        data: {
-            labels: values.map(item => item.label),
-            datasets: [{ label: 'Jumlah', data: values.map(item => item.value), backgroundColor: type === 'doughnut' ? colors : barColor, borderRadius: type === 'bar' ? 5 : 0, borderWidth: type === 'doughnut' ? 3 : 0 }],
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            animation: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 300 },
-            indexAxis: horizontal ? 'y' : 'x',
-            plugins: { legend: { display: type === 'doughnut', position: 'bottom' }, tooltip: { callbacks: { label: context => `Jumlah: ${context.raw ?? '-'}` } } },
-            ...(type === 'bar' ? { scales: { [horizontal ? 'x' : 'y']: { beginAtZero: true, ticks: { precision: 0 } }, [horizontal ? 'y' : 'x']: { grid: { display: false }, ticks: { autoSkip: false, callback: function(value) { const label = this.getLabelForValue(value); return label.length > 36 ? label.slice(0, 33) + '…' : label; } } } } } : {}),
-        },
-    });
-}
-
+    for (const canvas of document.querySelectorAll('[data-public-chart]')) {
+        const values = JSON.parse(canvas.dataset.values);
+        const type = canvas.dataset.chartType;
+        const barColor = canvas.id === 'projection-RETIREMENT' ? '#ef4444' : canvas.id === 'projection-REQUIREMENT' ? '#16a34a' : '#2563eb';
+        const horizontal = canvas.dataset.horizontal === 'true';
+        new Chart(canvas, {
+            type,
+            data: {
+                labels: values.map(item => item.label),
+                datasets: [{ label: 'Jumlah', data: values.map(item => item.value), backgroundColor: type === 'doughnut' ? colors : barColor, borderRadius: type === 'bar' ? 5 : 0, borderWidth: type === 'doughnut' ? 3 : 0 }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: type === 'bar' && !horizontal ? 20 : 8,
+                        right: type === 'bar' && horizontal ? 36 : 8,
+                        bottom: 8,
+                        left: 8,
+                    },
+                },
+                animation: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 300 },
+                indexAxis: horizontal ? 'y' : 'x',
+                plugins: {
+                    legend: { display: type === 'doughnut', position: 'bottom' },
+                    tooltip: { callbacks: { label: context => `Jumlah: ${context.raw ?? '-'}` } },
+                    datalabels: {
+                        display: context => {
+                            const val = context.dataset.data[context.dataIndex];
+                            return val !== null && val !== undefined && val !== 0;
+                        },
+                        anchor: type === 'doughnut' ? 'center' : 'end',
+                        align: type === 'doughnut' ? 'center' : (horizontal ? 'right' : 'top'),
+                        offset: type === 'doughnut' ? 0 : 4,
+                        clip: false,
+                        color: context => {
+                            if (type === 'doughnut') {
+                                const bg = colors[context.dataIndex % colors.length];
+                                return ['#facc15', '#fde68a', '#93c5fd'].includes(bg) ? '#0f172a' : '#ffffff';
+                            }
+                            return '#334155';
+                        },
+                        font: {
+                            weight: 'bold',
+                            size: 13,
+                        },
+                        formatter: value => value ?? '',
+                    },
+                },
+                ...(type === 'bar' ? {
+                    scales: {
+                        [horizontal ? 'x' : 'y']: {
+                            beginAtZero: true,
+                            grace: '10%',
+                            ticks: { precision: 0 },
+                        },
+                        [horizontal ? 'y' : 'x']: {
+                            grid: { display: false },
+                            ticks: {
+                                autoSkip: false,
+                                callback: function (value) {
+                                    const label = this.getLabelForValue(value);
+                                    return label.length > 36 ? label.slice(0, 33) + '…' : label;
+                                },
+                            },
+                        },
+                    },
+                } : {}),
+            },
+        });
+    }
 }
 renderCharts();
 

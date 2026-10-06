@@ -4,12 +4,15 @@ namespace App\Domain\Dashboard;
 
 use App\Models\PositionProjectionValue;
 use App\Models\ReportingPeriod;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 class DashboardQuery
 {
     public const FILTERS = ['employment_status' => 'Status', 'gender' => 'Jenis kelamin', 'education_level' => 'Pendidikan', 'grade_code' => 'Golongan', 'position_name' => 'Jabatan', 'position_class' => 'Kelas jabatan', 'placement_current' => 'Penempatan'];
 
-    public function personnel(ReportingPeriod $period, array $filters = [])
+    public function personnel(ReportingPeriod $period, array $filters = []): HasMany
     {
         $query = $period->personnel();
         foreach (array_merge(['employment_group'], array_keys(self::FILTERS)) as $field) {
@@ -21,7 +24,7 @@ class DashboardQuery
         return $query;
     }
 
-    private function breakdown($query, string $column): array
+    private function breakdown(Builder|Relation $query, string $column): array
     {
         return (clone $query)->select($column)->selectRaw('COUNT(*) as total')->groupBy($column)->orderByDesc('total')->get()->map(fn ($r) => ['label' => $r->$column ?: 'Belum diisi', 'value' => (int) $r->total])->all();
     }

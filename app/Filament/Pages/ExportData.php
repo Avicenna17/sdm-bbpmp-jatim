@@ -17,7 +17,7 @@ class ExportData extends Page
 
     protected static ?string $navigationGroup = 'Pengelolaan Data';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
     protected static string $view = 'filament.pages.export-data';
 
@@ -31,13 +31,13 @@ class ExportData extends Page
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->canAny(['export.personnel', 'export.position_requirement']) ?? false;
+        return Gate::any(['export.personnel', 'export.position_requirement']);
     }
 
     public function mount(): void
     {
-        $this->periodId = ReportingPeriod::orderByDesc('period_month')->value('id');
-        if (! auth()->user()->can('export.personnel')) {
+        $this->periodId = ReportingPeriod::where('status', 'published')->orderByDesc('period_month')->value('id');
+        if (! Gate::allows('export.personnel')) {
             $this->source = 'positions';
         }
     }
@@ -56,6 +56,11 @@ class ExportData extends Page
     {
         $this->validate(['source' => 'required|in:personnel,positions', 'format' => 'required|in:csv,xlsx', 'periodId' => 'required|exists:reporting_periods,id']);
         Gate::authorize($this->source === 'personnel' ? 'export.personnel' : 'export.position_requirement');
+        $reason = app(\App\Domain\Export\ExportEligibility::class)->reason(ReportingPeriod::find($this->periodId), $this->source, $this->filters);
+        if ($reason) {
+            $this->addError('export', $reason);
+            return null;
+        }
 
         return redirect()->route('exports', ['source' => $this->source, 'format' => $this->format, 'period_id' => $this->periodId] + $this->filters);
     }
@@ -69,6 +74,6 @@ class ExportData extends Page
             $options[$field] = $model::where('reporting_period_id', $this->periodId)->whereNotNull($field)->distinct()->orderBy($field)->pluck($field)->all();
         }
 
-        return ['periods' => ReportingPeriod::orderByDesc('period_month')->get(), 'fields' => $fields, 'options' => $options];
+        return ['exportBlockedReason' => app(\App\Domain\Export\ExportEligibility::class)->reason(ReportingPeriod::find($this->periodId), $this->source, $this->filters), 'periods' => ReportingPeriod::orderByDesc('period_month')->get(), 'fields' => $fields, 'options' => $options];
     }
 }

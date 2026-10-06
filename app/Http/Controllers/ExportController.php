@@ -18,6 +18,8 @@ class ExportController extends Controller
         Gate::authorize($source === 'personnel' ? 'export.personnel' : 'export.position_requirement');
         $filters = $request->validate(['period_id' => 'required|integer|exists:reporting_periods,id', 'employment_group' => 'nullable|in:ASN,PPNPN,UNKNOWN'] + array_fill_keys(array_merge(array_keys(DashboardQuery::FILTERS), ['position_type', 'requirement_status']), 'nullable|string|max:255'));
         $period = ReportingPeriod::findOrFail($filters['period_id']);
+        $reason = app(\App\Domain\Export\ExportEligibility::class)->reason($period, $source, $filters);
+        abort_if($reason !== null, 422, $reason ?? 'Ekspor tidak tersedia.');
         if ($source === 'personnel') {
             $query = $dashboard->personnel($period, $filters);
             $columns = ['name_at_period' => 'Nama', 'nip_at_period' => 'NIP/NIP3K', 'employment_group' => 'Grup', 'employment_status' => 'Status', 'gender' => 'Jenis Kelamin', 'education_level' => 'Pendidikan', 'rank_name' => 'Pangkat', 'grade_code' => 'Golongan', 'position_name' => 'Jabatan', 'position_class' => 'Kelas Jabatan', 'placement_current' => 'SK Tim Kerja (Baru)', 'placement_initial' => 'SK Tim Kerja (Awal)', 'assignment_detail' => 'Detail Penempatan Awal', 'nip_note' => 'Keterangan NIP'];
@@ -35,7 +37,28 @@ class ExportController extends Controller
             }
         }
 
-        return response()->streamDownload(function () use ($query, $columns, $period, $format) {
+        foreach ((clone $query)->lazy(500) as $record) {
+            foreach ($record->extra_data ?? [] as $key => $item) {
+                $columns[$key] = 'Tambahan: '.$item['label'].' ['.substr($key, 6, 8).']';
+            }
+        }
+
+        $sourceType = $source === 'personnel' ? 'PERSONNEL_DUK' : 'POSITION_REQUIREMENT';
+        $batch = $period->batches()->where('source_type', $sourceType)->where('status', 'committed')->latest('committed_at')->latest('id')->first();
+        $version = $batch?->template_version_id ? \App\Models\ImportTemplateVersion::find($batch->template_version_id) : null;
+        $definition = $version?->definition ?? app(\App\Domain\Templates\TemplateService::class)->defaults($sourceType);
+        $title = $definition['title'];
+        $description = trim($definition['subtitle'] ?? '');
+        if ($description === '' || preg_match('/^bulan\s*[-–]\s*tahun$/iu', $description)) {
+            $description = $period->label;
+        }
+        $safePart = static function (string $value): string {
+            $value = preg_replace('/[<>:"\\\\\/|?*\x00-\x1F\x7F]/u', '-', $value);
+            return mb_substr(trim(preg_replace('/\s+/u', ' ', $value), " ."), 0, 120);
+        };
+        $filename = $safePart($title).'_'.$safePart($description).'.'.$format;
+
+        return response()->streamDownload(function () use ($query, $columns, $period, $format, $title, $description) {
             $headers = ['Periode', 'Diekspor pada', ...array_values($columns)];
             $book = $format === 'xlsx' ? new Spreadsheet : null;
             $sheet = $book?->getActiveSheet()->setTitle($period->period_month->format('Y-m'));
@@ -51,13 +74,18 @@ class ExportController extends Controller
             };
             if ($stream) {
                 fwrite($stream, "\xEF\xBB\xBF");
-            } $write($headers, 1);
-            $row = 2;
+            }
+            $write([$title], 1);
+            $write([$description], 2);
+            $write($headers, 3);
+            $row = 4;
             $time = now()->toIso8601String();
             foreach ($query->lazy(500) as $record) {
                 $values = [$period->period_month->format('Y-m'), $time];
                 foreach ($columns as $field => $label) {
-                    if (str_starts_with($field, 'projection:')) {
+                    if (str_starts_with($field, 'extra:')) {
+                        $values[] = $record->extra_data[$field]['value'] ?? null;
+                    } elseif (str_starts_with($field, 'projection:')) {
                         [,$metric,$year] = explode(':', $field);
                         $values[] = $record->projections->first(fn ($p) => $p->metric_type === $metric && $p->projection_year == (int) $year)?->value;
                     } else {
@@ -67,13 +95,17 @@ class ExportController extends Controller
                 $write($values, $row++);
             }
             if ($book) {
-                $sheet->freezePane('A2');
-                $sheet->getStyle('1:1')->getFont()->setBold(true);
+                $last = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers));
+                $sheet->mergeCells('A1:'.$last.'1');
+                $sheet->mergeCells('A2:'.$last.'2');
+                $sheet->getStyle('A1:'.$last.'2')->getAlignment()->setHorizontal('center');
+                $sheet->freezePane('A4');
+                $sheet->getStyle('1:3')->getFont()->setBold(true);
                 (new Xlsx($book))->save('php://output');
                 $book->disconnectWorksheets();
             } else {
                 fclose($stream);
             }
-        }, $source.'-'.$period->period_month->format('Y-m').'.'.$format, ['Content-Type' => $format === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
+        }, $filename, ['Content-Type' => $format === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
     }
 }

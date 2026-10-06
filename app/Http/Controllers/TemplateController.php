@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Templates\TemplateService;
+use App\Models\ImportTemplate;
+use App\Models\ImportTemplateVersion;
 use App\Models\ReportingPeriod;
 use Illuminate\Support\Facades\Gate;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -12,7 +15,21 @@ class TemplateController extends Controller
 {
     public function __invoke(string $source)
     {
-        Gate::authorize('import.create');
+        abort_unless(Gate::allows('import.create') || Gate::allows('template.view'), 403);
+        abort_unless(in_array($source, ['personnel', 'positions']), 404);
+        $sourceType = $source === 'personnel' ? 'PERSONNEL_DUK' : 'POSITION_REQUIREMENT';
+        $versionId = request()->validate(['version_id' => 'nullable|integer|exists:import_template_versions,id'])['version_id'] ?? null;
+        $version = $versionId ? ImportTemplateVersion::findOrFail($versionId) : ImportTemplate::where('source', $sourceType)->first()?->activeVersion;
+        if ($version) {
+            abort_unless($version->template->source === $sourceType, 422);
+            abort_unless($version->activated_at || Gate::allows('template.manage'), 403);
+
+            return response()->streamDownload(function () use ($version) {
+                $book = app(TemplateService::class)->workbook($version);
+                (new Xlsx($book))->save('php://output');
+                $book->disconnectWorksheets();
+            }, $source === 'personnel' ? 'template_duk.xlsx' : 'template_peta_jabatan.xlsx', ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+        }
         $periodId = request()->validate(['period_id' => 'nullable|integer|exists:reporting_periods,id'])['period_id'] ?? null;
         $month = 'Bulan - tahun';
         $startYear = $periodId ? ReportingPeriod::findOrFail($periodId)->period_month->year : now()->year;

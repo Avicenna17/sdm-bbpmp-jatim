@@ -10,6 +10,9 @@ use Filament\Resources\Resource;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 
 class UserResource extends Resource
 {
@@ -29,7 +32,7 @@ class UserResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->can('user.manage') ?? false;
+        return Gate::allows('user.manage');
     }
 
     public static function canCreate(): bool
@@ -37,12 +40,12 @@ class UserResource extends Resource
         return static::canViewAny();
     }
 
-    public static function canEdit($record): bool
+    public static function canEdit(Model $record): bool
     {
         return static::canViewAny();
     }
 
-    public static function canDelete($record): bool
+    public static function canDelete(Model $record): bool
     {
         return false;
     }
@@ -52,7 +55,7 @@ class UserResource extends Resource
         return $form->schema([
             TextInput::make('name')->label('Nama')->required()->maxLength(255), TextInput::make('email')->email()->required()->unique(ignoreRecord: true)->maxLength(255),
             TextInput::make('password')->label('Password baru')->password()->minLength(12)->required(fn (string $operation) => $operation === 'create')->dehydrated(fn ($state) => filled($state))->afterStateHydrated(fn ($component) => $component->state(null)),
-            Select::make('roles')->label('Role')->relationship('roles', 'name')->multiple()->preload()->required()->disabled(fn ($record) => $record?->id === auth()->id())->helperText('Role akun sendiri tidak dapat diubah di sini.'),
+            Select::make('roles')->label('Role')->relationship('roles', 'name')->multiple()->preload()->required()->disabled(fn ($record) => $record?->id === Auth::id())->helperText('Role akun sendiri tidak dapat diubah di sini.'),
         ]);
     }
 

@@ -5,9 +5,13 @@ namespace App\Filament\Pages;
 use App\Domain\Import\ImportService;
 use App\Domain\ReportingPeriod\PublishPeriodService;
 use App\Models\ImportBatch;
+use App\Models\ImportTemplateVersion;
 use App\Models\ReportingPeriod;
+use App\Models\User;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
@@ -25,7 +29,7 @@ class ManageData extends Page
 
     protected static ?string $navigationGroup = 'Pengelolaan Data';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
     protected static string $view = 'filament.pages.manage-data';
 
@@ -35,14 +39,42 @@ class ManageData extends Page
 
     public string $source = 'PERSONNEL_DUK';
 
-    public $file;
+    public ?int $templateVersionId = null;
+
+    public array $templateMapping = [];
+
+    public string $ignoredColumns = '';
+
+    public function updatedSource(): void
+    {
+        $this->templateVersionId = null;
+        $this->templateMapping = [];
+        $this->ignoredColumns = '';
+    }
+
+    public function updatedTemplateVersionId(): void
+    {
+        $this->templateMapping = [];
+        $this->ignoredColumns = '';
+    }
+
+    /** @var UploadedFile|null */
+    public $file = null;
 
     #[Locked]
     public ?int $batchId = null;
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->can('period.view') ?? false;
+        return Gate::allows('period.view');
+    }
+
+    private function authenticatedUser(): User
+    {
+        $user = Auth::user();
+        abort_unless($user instanceof User, 403);
+
+        return $user;
     }
 
     public function mount(): void
@@ -73,7 +105,7 @@ class ManageData extends Page
     {
         Gate::authorize('import.create');
         $this->validate(['periodId' => 'required|exists:reporting_periods,id', 'file' => 'required|file|mimes:xls,xlsx|max:15360', 'source' => 'required|in:PERSONNEL_DUK,POSITION_REQUIREMENT']);
-        $batch = app(ImportService::class)->preview(auth()->user(), ReportingPeriod::findOrFail($this->periodId), $this->source, $this->file);
+        $batch = app(ImportService::class)->preview($this->authenticatedUser(), ReportingPeriod::findOrFail($this->periodId), $this->source, $this->file, $this->templateVersionId, $this->templateMapping, array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $this->ignoredColumns)))));
         $this->batchId = $batch->id;
         $this->file = null;
         Notification::make()->title($batch->status === 'committed' ? 'File ini sudah disimpan; tidak ada perubahan.' : 'Pemeriksaan selesai. Tinjau hasilnya sebelum menyimpan.')->send();
@@ -92,7 +124,7 @@ class ManageData extends Page
         Gate::authorize('import.commit');
         $this->resetValidation();
         try {
-            app(ImportService::class)->commit(auth()->user(), ImportBatch::findOrFail($this->batchId));
+            app(ImportService::class)->commit($this->authenticatedUser(), ImportBatch::findOrFail($this->batchId));
         } catch (ValidationException $exception) {
             Notification::make()->title('Data belum tersimpan')->body(collect($exception->errors())->flatten()->first())->danger()->persistent()->send();
             throw $exception;
@@ -104,7 +136,7 @@ class ManageData extends Page
     {
         Gate::authorize('import.create');
         $this->resetValidation();
-        $batch = app(ImportService::class)->revalidate(auth()->user(), ImportBatch::findOrFail($this->batchId));
+        $batch = app(ImportService::class)->revalidate($this->authenticatedUser(), ImportBatch::findOrFail($this->batchId));
         $this->batchId = $batch->id;
         $this->periodId = $batch->reporting_period_id;
         Notification::make()->title('Pemeriksaan selesai. Tinjau hasilnya, lalu pilih Simpan data.')->send();
@@ -113,16 +145,19 @@ class ManageData extends Page
     public function publish(): void
     {
         Gate::authorize('period.publish');
-        app(PublishPeriodService::class)->publish(auth()->user(), ReportingPeriod::findOrFail($this->periodId));
+        app(PublishPeriodService::class)->publish($this->authenticatedUser(), ReportingPeriod::findOrFail($this->periodId));
         Notification::make()->title('Periode dipublikasikan')->success()->send();
     }
 
     protected function getViewData(): array
     {
         $period = $this->periodId ? ReportingPeriod::find($this->periodId) : null;
-        $batch = $this->batchId && auth()->user()->can('import.view') ? ImportBatch::with('issues')->find($this->batchId) : null;
+        $batch = $this->batchId && Gate::allows('import.view') ? ImportBatch::with('issues')->find($this->batchId) : null;
         $preview = $batch && $batch->status === 'validated' ? array_slice(app(ImportService::class)->rows($batch), 0, 25) : [];
 
-        return ['periods' => ReportingPeriod::orderByDesc('period_month')->get(), 'period' => $period, 'batch' => $batch, 'previewRows' => $preview, 'history' => auth()->user()->can('import.view') ? ImportBatch::with('uploader')->when($period, fn ($q) => $q->where('reporting_period_id', $period->id))->latest()->limit(30)->get() : collect()];
+        $templateVersions = ImportTemplateVersion::whereHas('template', fn ($q) => $q->where('source', $this->source))->whereNotNull('activated_at')->orderByDesc('number')->get();
+        $selectedTemplate = $templateVersions->firstWhere('id', $this->templateVersionId);
+
+        return ['templateVersions' => $templateVersions, 'selectedTemplate' => $selectedTemplate, 'periods' => ReportingPeriod::orderByDesc('period_month')->get(), 'period' => $period, 'batch' => $batch, 'previewRows' => $preview, 'history' => Gate::allows('import.view') ? ImportBatch::with('uploader')->when($period, fn ($q) => $q->where('reporting_period_id', $period->id))->latest()->limit(30)->get() : collect()];
     }
 }

@@ -49,6 +49,7 @@ class PositionDocumentationTest extends TestCase
             $this->assertDatabaseHas('position_projection_values', ['metric_type' => 'RETIREMENT', 'projection_year' => 2045, 'value' => 0]);
             $this->assertDatabaseHas('position_projection_values', ['metric_type' => 'REQUIREMENT', 'projection_year' => 2050, 'value' => 9]);
             Livewire::test(PositionData::class)->assertSee('Pensiun 2045')->assertSee('Proyeksi Kebutuhan 2050')->assertSee('Induk Contoh')->assertCanSeeTableRecords($period->positions()->get());
+        $period->update(['status' => 'published']);
             $csv = $this->get('/exports/positions/csv?period_id='.$period->id)->assertOk()->streamedContent();
             $this->assertStringContainsString('Usia Pensiun', $csv);
             $this->assertStringContainsString('Total Pensiun 5 Tahun', $csv);

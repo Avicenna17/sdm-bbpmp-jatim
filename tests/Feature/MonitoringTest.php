@@ -193,7 +193,7 @@ class MonitoringTest extends TestCase
         $this->actingAs($viewer)->get('/admin/manage-data')->assertOk();
         $this->get('/admin/users')->assertForbidden();
         $this->get('/admin/roles')->assertForbidden();
-        $this->get('/templates/personnel')->assertForbidden();
+        $this->get('/templates/personnel')->assertOk();
         Livewire::test(ManageData::class)->call('publish')->assertForbidden();
     }
 
@@ -205,6 +205,7 @@ class MonitoringTest extends TestCase
             $r = $this->get($url);
             $this->assertContains($r->status(), [200, 302], $url.' '.$r->getContent());
         }
+        $this->period->update(['status' => 'published']);
         $response = $this->get('/exports/personnel/csv?period_id='.$this->period->id.'&employment_group=ASN');
         $response->assertOk();
         $csv = $response->streamedContent();
@@ -216,13 +217,31 @@ class MonitoringTest extends TestCase
         try {
             file_put_contents($path, $xlsx);
             $book = IOFactory::load($path);
-            $this->assertSame('198001012005011001', $book->getActiveSheet()->getCell('D2')->getValue());
-            $this->assertSame(DataType::TYPE_STRING, $book->getActiveSheet()->getCell('D2')->getDataType());
+            $this->assertSame('198001012005011001', $book->getActiveSheet()->getCell('D4')->getValue());
+            $this->assertSame(DataType::TYPE_STRING, $book->getActiveSheet()->getCell('D4')->getDataType());
             $book->disconnectWorksheets();
         } finally {
             unlink($path);
         }
         $this->get('/admin/import-history')->assertOk();
+    }
+
+    public function test_export_rejects_unpublished_empty_and_filtered_empty_data(): void
+    {
+        $this->actingAs($this->admin);
+        $url = '/exports/personnel/csv?period_id='.$this->period->id;
+        $this->get($url)->assertStatus(422);
+        $this->import([['Contoh', '198001012005011001', 'PNS']]);
+        $this->get($url)->assertStatus(422);
+        $this->period->update(['status' => 'ready']);
+        $this->get($url)->assertStatus(422);
+        $this->period->update(['status' => 'published']);
+        $this->get($url)->assertOk();
+        $this->get($url.'&employment_group=PPNPN')->assertStatus(422);
+        $this->get('/exports/positions/xlsx?period_id='.$this->period->id)->assertStatus(422);
+        Livewire::test(\App\Filament\Pages\ExportData::class)
+            ->set('periodId', $this->period->id)->set('filters.employment_group', 'PPNPN')
+            ->call('download')->assertHasErrors('export');
     }
 
     public function test_draft_is_not_public_and_published_revision_requires_permission(): void

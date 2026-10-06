@@ -3,6 +3,7 @@
 namespace App\Domain\Import;
 
 use App\Models\ImportBatch;
+use App\Models\ImportTemplate;
 use App\Models\Person;
 use App\Models\PersonnelSnapshot;
 use App\Models\PositionRequirementSnapshot;
@@ -34,23 +35,27 @@ class ImportService
         }
 
         return $this->preview($user, $batch->period, $batch->source_type,
-            new UploadedFile($path, $batch->original_filename, null, null, true));
+            new UploadedFile($path, $batch->original_filename, null, null, true), $batch->summary['requested_template_version_id'] ?? $batch->template_version_id, $batch->summary['mapping_overrides'] ?? [], $batch->summary['ignored_columns'] ?? []);
     }
 
-    public function preview(User $user, ReportingPeriod $period, string $source, UploadedFile $file): ImportBatch
+    public function preview(User $user, ReportingPeriod $period, string $source, UploadedFile $file, ?int $versionId = null, array $mapping = [], array $ignored = []): ImportBatch
     {
         Gate::forUser($user)->authorize('import.create');
         Validator::make(['file' => $file, 'source' => $source], ['file' => 'required|file|mimes:xls,xlsx|max:15360', 'source' => 'required|in:PERSONNEL_DUK,POSITION_REQUIREMENT'])->validate();
         $checksum = hash_file('sha256', $file->getRealPath());
         // Only the CURRENT committed batch can be a no-op. An older file may restore a previous version.
         $current = $period->batches()->where('source_type', $source)->where('status', 'committed')->latest('committed_at')->latest('id')->first();
-        if ($current?->sha256 === $checksum && ($current->summary['source_policy'] ?? null) === 'duk-only-v1') {
+        if (! $versionId && ! $mapping && ! $ignored && ! $current?->template_version_id && $current?->sha256 === $checksum && ($current->summary['source_policy'] ?? null) === 'duk-only-v1') {
             return $current;
         }
+        $context = ['requested_template_version_id' => $versionId, 'mapping_overrides' => $mapping, 'ignored_columns' => $ignored];
         $path = $file->store('imports/'.$period->id, 'local');
-        $batch = ImportBatch::create(['reporting_period_id' => $period->id, 'uploaded_by' => $user->id, 'source_type' => $source, 'original_filename' => mb_substr($file->getClientOriginalName(), 0, 255), 'sha256' => $checksum, 'path' => $path, 'disk' => 'local', 'status' => 'parsing', 'base_revision' => $period->fresh()->revision]);
+        $batch = ImportBatch::create(['reporting_period_id' => $period->id, 'uploaded_by' => $user->id, 'source_type' => $source, 'original_filename' => mb_substr($file->getClientOriginalName(), 0, 255), 'sha256' => $checksum, 'path' => $path, 'disk' => 'local', 'status' => 'parsing', 'summary' => $context, 'base_revision' => $period->fresh()->revision]);
         try {
-            $parsed = $this->parser->parse(Storage::disk('local')->path($path), $source);
+            $parsed = $this->parser->parse(Storage::disk('local')->path($path), $source, $versionId, $mapping, $ignored);
+            if ($versionId !== 0 && empty($parsed['summary']['template_version_id']) && ImportTemplate::where('source', $source)->whereHas('activeVersion', fn ($query) => $query->whereNull('definition->initial_template'))->exists()) {
+                throw new \RuntimeException('File tidak memiliki penanda versi. Pilih versi template secara manual. Jika ini dokumen lama, pilih Format bawaan lama; kolom tambahan memerlukan versi template.');
+            }
             $parsed['summary']['source_policy'] = 'duk-only-v1';
             foreach ($parsed['issues'] as $issue) {
                 $batch->issues()->create($issue);
@@ -60,13 +65,13 @@ class ImportService
             $locationKey = fn ($issue) => ($issue['source_sheet'] ?? '').':'.($issue['source_row'] ?? 0);
             $errors = $errorIssues->unique($locationKey)->count();
             $warnings = $warningIssues->unique($locationKey)->count();
-            $summary = $this->diff($period, $source, $parsed['rows']) + ($parsed['summary'] ?? []) + [
+            $summary = $this->diff($period, $source, $parsed['rows']) + ($parsed['summary'] ?? []) + $context + [
                 'primary_warning_rows' => $warningIssues->where('source_sheet', 'DUK PEGAWAI')->unique($locationKey)->count(),
                 'supplemental_warning_rows' => $warningIssues->where('source_sheet', 'P3K - PPNPN')->unique($locationKey)->count(),
                 'info_count' => collect($parsed['issues'])->where('severity', 'INFO')->count(),
             ];
             Storage::disk('local')->put($this->stagingPath($batch), json_encode($parsed['rows'], JSON_THROW_ON_ERROR));
-            $batch->update(['status' => $errors ? 'failed' : 'validated', 'total_rows' => count($parsed['rows']), 'valid_rows' => max(0, count($parsed['rows']) - $errors), 'warning_rows' => $warnings, 'error_rows' => $errors, 'summary' => $summary]);
+            $batch->update(['template_version_id' => $parsed['summary']['template_version_id'] ?? null, 'status' => $errors ? 'failed' : 'validated', 'total_rows' => count($parsed['rows']), 'valid_rows' => max(0, count($parsed['rows']) - $errors), 'warning_rows' => $warnings, 'error_rows' => $errors, 'summary' => $summary]);
         } catch (\Throwable $e) {
             $batch->issues()->create(['severity' => 'ERROR', 'code' => 'PARSE_FAILED', 'message' => get_class($e) === \RuntimeException::class ? $e->getMessage() : 'Workbook gagal dibaca. Periksa format dan gunakan template.']);
             $batch->update(['status' => 'failed', 'error_rows' => 1]);

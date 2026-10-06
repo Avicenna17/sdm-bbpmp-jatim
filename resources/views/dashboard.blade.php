@@ -37,9 +37,9 @@
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8" aria-labelledby="filter-heading">
         <h2 id="filter-heading" class="text-xl font-bold text-slate-900 mb-4">Filter data kepegawaian</h2>
         <form method="get" action="{{ route('dashboard') }}" class="portal-card" data-dashboard-filter>
+            <input type="hidden" name="period" value="{{ $period->period_month->format('Y-m') }}">
             @foreach(['position_search','position_type'] as $field)@if(filled($filters[$field]??null))<input type="hidden" name="{{ $field }}" value="{{ $filters[$field] }}">@endif@endforeach
             <div class="flex flex-wrap items-end gap-5">
-                <label class="portal-label">Periode<select name="period" class="portal-input" data-auto-filter>@foreach($periods as $option)<option value="{{ $option->period_month->format('Y-m') }}" @selected($option->id===$period->id)>{{ $option->label }}</option>@endforeach</select></label>
                 <fieldset><legend class="text-xs font-semibold text-slate-600 mb-2">Kelompok pegawai</legend><div class="flex gap-2">@foreach(['ASN','PPNPN'] as $group)<label class="portal-segment"><input type="radio" data-auto-filter name="employment_group" value="{{ $group }}" @checked($filters['employment_group']===$group)><span>{{ $group }}</span></label>@endforeach</div></fieldset>
             </div>
             <details class="mt-5" @if(count(array_filter(\Illuminate\Support\Arr::only($filters,array_keys(\App\Domain\Dashboard\DashboardQuery::FILTERS))))>0) open @endif><summary class="text-sm font-semibold text-blue-900 cursor-pointer">Filter lebih lanjut</summary><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">

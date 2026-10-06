@@ -10,6 +10,7 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Gate;
 
 class PersonnelData extends Page implements HasTable
 {
@@ -70,7 +71,7 @@ class PersonnelData extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->can('personnel.view') ?? false;
+        return Gate::allows('personnel.view');
     }
 
     public function table(Table $table): Table
@@ -84,6 +85,8 @@ class PersonnelData extends Page implements HasTable
         foreach (array_diff_key($fields, array_flip(['name_at_period', 'nip_at_period'])) as $field => $label) {
             $filters[] = SelectFilter::make($field)->label($label)->options(fn () => PersonnelSnapshot::whereNotNull($field)->distinct()->orderBy($field)->pluck($field, $field)->map(fn ($value) => $value === 'UNKNOWN' ? '-' : $value)->all())->searchable();
         }
+
+        $columns[] = TextColumn::make('extra_data')->label('Data tambahan')->getStateUsing(fn ($record) => collect($record->extra_data ?? [])->map(fn ($item) => $item['label'].': '.($item['value'] ?? '-'))->values()->all())->listWithLineBreaks()->wrap()->toggleable();
 
         return $table->query(PersonnelSnapshot::query()->with('period'))->columns($columns)->filters($filters)->deferFilters(false)->defaultSort('name_at_period')->emptyStateHeading('Tidak ada data pegawai untuk filter ini')->emptyStateDescription('Periksa pilihan periode dan filter. Untuk menambahkan data, unggah DUK melalui Periode dan Import Data lalu pilih Simpan data.');
     }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Import;
 
+use App\Domain\Templates\TemplateReader;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\Xls;
@@ -14,6 +15,8 @@ class WorkbookParser
     public const PERSONNEL = 'PERSONNEL_DUK';
 
     public const POSITION = 'POSITION_REQUIREMENT';
+
+    private TemplateReader $templateReader;
 
     private array $issues = [];
 
@@ -46,7 +49,7 @@ class WorkbookParser
         $this->issues[] = ['source_sheet' => $this->sheetName ?: null, 'source_cell' => $cell, 'source_row' => $row, 'field_name' => $field, 'severity' => $severity, 'code' => $code, 'message' => $message];
     }
 
-    public function parse(string $path, string $source): array
+    public function parse(string $path, string $source, ?int $versionId = null, array $mapping = [], array $ignored = [], bool $allowDraft = false): array
     {
         $this->issues = [];
         $this->sheetName = '';
@@ -63,6 +66,8 @@ class WorkbookParser
         $reader->setReadDataOnly(false);
         $book = $reader->load($path);
         try {
+            $this->templateReader = new TemplateReader;
+            $this->templateReader->resolve($book, $source, $versionId, $mapping, $ignored, $allowDraft);
             if ($source === self::PERSONNEL) {
                 $sheet = $book->getSheetByName('DUK PEGAWAI');
                 if (! $sheet) {
@@ -72,7 +77,11 @@ class WorkbookParser
                 // DUK PEGAWAI is the sole authoritative source, including placement.
             } else {
                 $rows = null;
-                foreach ($book->getWorksheetIterator() as $sheet) {
+                $sheets = $this->templateReader->version ? [$book->getSheetByName('PETA JABATAN')] : $book->getWorksheetIterator();
+                foreach ($sheets as $sheet) {
+                    if (! $sheet) {
+                        throw new RuntimeException('Lembar PETA JABATAN tidak ditemukan. Gunakan nama lembar sesuai template.');
+                    }
                     try {
                         $rows = $this->readSheet($sheet, $source);
                         break;
@@ -90,13 +99,20 @@ class WorkbookParser
                 $this->issue(0, 'ERROR', 'EMPTY_DATASET', 'Tidak ada baris data. Snapshot kosong tidak dapat di-commit.');
             }
 
+            if ($this->templateReader->version) {
+                $this->summary['template_version_id'] = $this->templateReader->version->id;
+                $this->summary['template_mapping'] = $this->templateReader->mapping;
+                $this->summary['ignored_columns'] = $ignored;
+                $this->summary['mapping_overrides'] = $mapping;
+            }
+
             return ['rows' => $rows, 'issues' => $this->issues, 'summary' => $this->summary];
         } finally {
             $book->disconnectWorksheets();
         }
     }
 
-    private function aliases(string $source): array
+    public function aliases(string $source): array
     {
         if ($source === self::PERSONNEL) {
             return [
@@ -121,6 +137,9 @@ class WorkbookParser
     {
         if ($sheet->getHighestDataRow() > 15000 || Coordinate::columnIndexFromString($sheet->getHighestDataColumn()) > 200) {
             throw new RuntimeException('Workbook melebihi batas 15.000 baris / 200 kolom.');
+        }
+        if ($this->templateReader->version) {
+            return $this->templateReader->table($sheet);
         }
         $data = $sheet->toArray(null, false, false, false);
         // Propagate only merged header cells, never merged data rows.
@@ -240,6 +259,9 @@ class WorkbookParser
             foreach ($map as $field => $col) {
                 $value = self::clean($line[$col] ?? '');
                 $row[$field] = $value === '' ? null : $value;
+            }
+            foreach ($this->templateReader->additional($row) as $message) {
+                $this->issue($index + 1, 'ERROR', 'INVALID_TEMPLATE_VALUE', $message);
             }
             $identity = $row[$source === self::PERSONNEL ? 'name_at_period' : 'position_name'] ?? null;
             if (in_array(self::norm($identity), ['JUMLAH', 'TOTAL', 'JUMLAH TOTAL'], true)) {

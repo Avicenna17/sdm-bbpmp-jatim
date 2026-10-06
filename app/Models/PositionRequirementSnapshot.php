@@ -10,7 +10,7 @@ class PositionRequirementSnapshot extends Model
 
     protected function casts(): array
     {
-        return ['raw_payload' => 'array'];
+        return ['raw_payload' => 'array', 'extra_data' => 'array'];
     }
 
     public function period()
