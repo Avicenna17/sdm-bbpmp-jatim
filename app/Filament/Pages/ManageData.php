@@ -4,8 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Domain\Import\ImportService;
 use App\Domain\ReportingPeriod\PublishPeriodService;
+use App\Domain\ReportingPeriod\PublishPositionService;
 use App\Models\ImportBatch;
 use App\Models\ImportTemplateVersion;
+use App\Models\PositionDataset;
 use App\Models\ReportingPeriod;
 use App\Models\User;
 use Filament\Notifications\Notification;
@@ -45,8 +47,22 @@ class ManageData extends Page
 
     public string $ignoredColumns = '';
 
+    public function selectSource(string $source): void
+    {
+        abort_unless(in_array($source, ['PERSONNEL_DUK', 'POSITION_REQUIREMENT'], true), 422);
+        if ($this->source === $source) {
+            return;
+        }
+        $this->source = $source;
+        $this->updatedSource();
+    }
+
     public function updatedSource(): void
     {
+        abort_unless(in_array($this->source, ['PERSONNEL_DUK', 'POSITION_REQUIREMENT'], true), 422);
+        $this->file = null;
+        $this->batchId = null;
+        $this->resetValidation();
         $this->templateVersionId = null;
         $this->templateMapping = [];
         $this->ignoredColumns = '';
@@ -104,8 +120,8 @@ class ManageData extends Page
     public function preview(): void
     {
         Gate::authorize('import.create');
-        $this->validate(['periodId' => 'required|exists:reporting_periods,id', 'file' => 'required|file|mimes:xls,xlsx|max:15360', 'source' => 'required|in:PERSONNEL_DUK,POSITION_REQUIREMENT']);
-        $batch = app(ImportService::class)->preview($this->authenticatedUser(), ReportingPeriod::findOrFail($this->periodId), $this->source, $this->file, $this->templateVersionId, $this->templateMapping, array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $this->ignoredColumns)))));
+        $this->validate(['periodId' => ($this->source === 'PERSONNEL_DUK' ? 'required' : 'nullable').'|exists:reporting_periods,id', 'file' => 'required|file|mimes:xls,xlsx|max:15360', 'source' => 'required|in:PERSONNEL_DUK,POSITION_REQUIREMENT']);
+        $batch = app(ImportService::class)->preview($this->authenticatedUser(), ReportingPeriod::find($this->periodId), $this->source, $this->file, $this->templateVersionId, $this->templateMapping, array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $this->ignoredColumns)))));
         $this->batchId = $batch->id;
         $this->file = null;
         Notification::make()->title($batch->status === 'committed' ? 'File ini sudah disimpan; tidak ada perubahan.' : 'Pemeriksaan selesai. Tinjau hasilnya sebelum menyimpan.')->send();
@@ -115,7 +131,10 @@ class ManageData extends Page
     {
         Gate::authorize('import.view');
         $batch = ImportBatch::findOrFail($id);
-        $this->periodId = $batch->reporting_period_id;
+        $this->selectSource($batch->source_type);
+        if ($batch->source_type === 'PERSONNEL_DUK') {
+            $this->periodId = $batch->reporting_period_id;
+        }
         $this->batchId = $id;
     }
 
@@ -129,7 +148,7 @@ class ManageData extends Page
             Notification::make()->title('Data belum tersimpan')->body(collect($exception->errors())->flatten()->first())->danger()->persistent()->send();
             throw $exception;
         }
-        Notification::make()->title('Data berhasil disimpan')->body('Hasil import sudah tersedia pada periode yang dipilih.')->success()->send();
+        Notification::make()->title('Data berhasil disimpan')->body('Hasil import tersimpan. Publikasikan sumber data ini saat siap ditampilkan.')->success()->send();
     }
 
     public function revalidate(): void
@@ -137,8 +156,11 @@ class ManageData extends Page
         Gate::authorize('import.create');
         $this->resetValidation();
         $batch = app(ImportService::class)->revalidate($this->authenticatedUser(), ImportBatch::findOrFail($this->batchId));
+        $this->selectSource($batch->source_type);
+        if ($batch->source_type === 'PERSONNEL_DUK') {
+            $this->periodId = $batch->reporting_period_id;
+        }
         $this->batchId = $batch->id;
-        $this->periodId = $batch->reporting_period_id;
         Notification::make()->title('Pemeriksaan selesai. Tinjau hasilnya, lalu pilih Simpan data.')->send();
     }
 
@@ -147,6 +169,12 @@ class ManageData extends Page
         Gate::authorize('period.publish');
         app(PublishPeriodService::class)->publish($this->authenticatedUser(), ReportingPeriod::findOrFail($this->periodId));
         Notification::make()->title('Periode dipublikasikan')->success()->send();
+    }
+
+    public function publishPositions(int $batchId): void
+    {
+        app(PublishPositionService::class)->publish($this->authenticatedUser(), $batchId);
+        Notification::make()->title('Peta Jabatan dipublikasikan')->success()->send();
     }
 
     protected function getViewData(): array
@@ -158,6 +186,6 @@ class ManageData extends Page
         $templateVersions = ImportTemplateVersion::whereHas('template', fn ($q) => $q->where('source', $this->source))->whereNotNull('activated_at')->orderByDesc('number')->get();
         $selectedTemplate = $templateVersions->firstWhere('id', $this->templateVersionId);
 
-        return ['templateVersions' => $templateVersions, 'selectedTemplate' => $selectedTemplate, 'periods' => ReportingPeriod::orderByDesc('period_month')->get(), 'period' => $period, 'batch' => $batch, 'previewRows' => $preview, 'history' => Gate::allows('import.view') ? ImportBatch::with('uploader')->when($period, fn ($q) => $q->where('reporting_period_id', $period->id))->latest()->limit(30)->get() : collect()];
+        return ['activePeriod' => ReportingPeriod::activePublished(), 'positionState' => PositionDataset::current()->load('draftBatch'), 'positionCount' => PositionDataset::snapshots(false)->count(), 'templateVersions' => $templateVersions, 'selectedTemplate' => $selectedTemplate, 'periods' => ReportingPeriod::orderByDesc('period_month')->get(), 'period' => $period, 'batch' => $batch, 'previewRows' => $preview, 'history' => Gate::allows('import.view') ? ImportBatch::with('uploader')->where('source_type', $this->source)->when($this->source === 'PERSONNEL_DUK', fn ($q) => $q->where('reporting_period_id', $this->periodId))->latest()->limit(30)->get() : collect()];
     }
 }

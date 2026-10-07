@@ -28,7 +28,7 @@
                     </h2>
 
                     <p class="text-slate-300 text-sm sm:text-base leading-relaxed">
-                        Sistem pemantauan agregat formasi pegawai, pemenuhan Analisis Beban Kerja (ABK), profil kepangkatan DUK, dan proyeksi suksesi pensiun berdasarkan periode yang telah dipublikasikan.
+                        Sistem pemantauan agregat formasi pegawai, pemenuhan Analisis Beban Kerja (ABK), profil kepangkatan DUK, dan proyeksi suksesi pensiun menggunakan DUK per periode dan Peta Jabatan terbaru yang telah dipublikasikan.
                     </p>
 
                     <!-- Trust & Compliance Badges -->

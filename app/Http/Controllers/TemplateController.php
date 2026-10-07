@@ -32,7 +32,7 @@ class TemplateController extends Controller
         }
         $periodId = request()->validate(['period_id' => 'nullable|integer|exists:reporting_periods,id'])['period_id'] ?? null;
         $month = 'Bulan - tahun';
-        $startYear = $periodId ? ReportingPeriod::findOrFail($periodId)->period_month->year : now()->year;
+        $startYear = $source === 'personnel' && $periodId ? ReportingPeriod::findOrFail($periodId)->period_month->year : now()->year;
         $headers = $source === 'personnel' ? ['NO', 'NAMA', 'NIP/NIP3K', 'PANGKAT', 'GOL', 'JABATAN', 'KELAS JABATAN', 'PENEMPATAN', 'PENDIDIKAN', 'JENIS KELAMIN', 'STATUS'] : ['NO', 'UNIT ORGANISASI INDUK', 'SATUAN KERJA', 'NAMA JABATAN', 'JENIS JABATAN', 'KELAS JABATAN', 'USIA PENSIUN', 'JUMLAH PEMANGKU', 'JUMLAH KEBUTUHAN', 'JUMLAH KOSONG', 'STATUS', 'TOTAL PENSIUN 5 TAHUN'];
         if ($source === 'positions') {
             foreach (['Pensiun' => 7, 'Proyeksi Kebutuhan' => 5] as $prefix => $count) {
@@ -84,7 +84,7 @@ class TemplateController extends Controller
                 $guide->fromArray([
                     ['PETUNJUK PENGISIAN PETA JABATAN'],
                     ['Isi data pada lembar PETA JABATAN, mulai baris 2.'],
-                    ['Kolom tahun adalah contoh berdasarkan periode yang dipilih.'],
+                    ['Kolom tahun adalah contoh berdasarkan tahun berjalan, bukan periode DUK.'],
                     ['Tahun boleh diganti; kolom tahun boleh ditambah atau dihapus sesuai data.'],
                     ['Gunakan judul Pensiun YYYY atau Proyeksi Kebutuhan YYYY, misalnya Pensiun 2033.'],
                     ['Satu jenis dan tahun hanya boleh muncul sekali. Isi 0 jika nilainya nol; kosongkan jika data tidak tersedia.'],

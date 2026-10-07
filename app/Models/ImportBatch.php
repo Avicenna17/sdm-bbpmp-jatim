@@ -40,7 +40,12 @@ class ImportBatch extends Model
 
     protected function casts(): array
     {
-        return ['summary' => 'array', 'committed_at' => 'datetime'];
+        return ['position_version' => 'integer', 'summary' => 'array', 'committed_at' => 'datetime', 'published_at' => 'datetime'];
+    }
+
+    public function positionSnapshots()
+    {
+        return $this->hasMany(PositionRequirementSnapshot::class);
     }
 
     public function period()

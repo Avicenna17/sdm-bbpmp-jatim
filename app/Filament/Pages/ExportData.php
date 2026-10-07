@@ -3,8 +3,9 @@
 namespace App\Filament\Pages;
 
 use App\Domain\Dashboard\DashboardQuery;
+use App\Domain\Export\ExportEligibility;
 use App\Models\PersonnelSnapshot;
-use App\Models\PositionRequirementSnapshot;
+use App\Models\PositionDataset;
 use App\Models\ReportingPeriod;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Gate;
@@ -27,6 +28,8 @@ class ExportData extends Page
 
     public ?int $periodId = null;
 
+    public ?int $positionVersionId = null;
+
     public array $filters = [];
 
     public static function canAccess(): bool
@@ -36,6 +39,7 @@ class ExportData extends Page
 
     public function mount(): void
     {
+        $this->positionVersionId = PositionDataset::current()->published_batch_id;
         $this->periodId = ReportingPeriod::where('status', 'published')->orderByDesc('period_month')->value('id');
         if (! Gate::allows('export.personnel')) {
             $this->source = 'positions';
@@ -44,6 +48,8 @@ class ExportData extends Page
 
     public function updatedSource(): void
     {
+        $this->positionVersionId = PositionDataset::current()->published_batch_id;
+        $this->resetValidation();
         $this->filters = [];
     }
 
@@ -52,28 +58,39 @@ class ExportData extends Page
         $this->filters = [];
     }
 
+    public function updatedPositionVersionId(): void
+    {
+        $this->filters = [];
+        $this->resetValidation();
+    }
+
+    private function exportFilters(): array
+    {
+        return ['position_version_id' => $this->positionVersionId] + $this->filters;
+    }
+
     public function download()
     {
-        $this->validate(['source' => 'required|in:personnel,positions', 'format' => 'required|in:csv,xlsx', 'periodId' => 'required|exists:reporting_periods,id']);
+        $this->validate(['source' => 'required|in:personnel,positions', 'format' => 'required|in:csv,xlsx', 'positionVersionId' => 'nullable|integer|exists:import_batches,id', 'periodId' => ($this->source === 'personnel' ? 'required' : 'nullable').'|exists:reporting_periods,id']);
         Gate::authorize($this->source === 'personnel' ? 'export.personnel' : 'export.position_requirement');
-        $reason = app(\App\Domain\Export\ExportEligibility::class)->reason(ReportingPeriod::find($this->periodId), $this->source, $this->filters);
+        $reason = app(ExportEligibility::class)->reason(ReportingPeriod::find($this->periodId), $this->source, $this->exportFilters());
         if ($reason) {
             $this->addError('export', $reason);
+
             return null;
         }
 
-        return redirect()->route('exports', ['source' => $this->source, 'format' => $this->format, 'period_id' => $this->periodId] + $this->filters);
+        return redirect()->route('exports', ['source' => $this->source, 'format' => $this->format, 'position_version_id' => $this->source === 'positions' ? $this->positionVersionId : null, 'period_id' => $this->source === 'personnel' ? $this->periodId : null] + $this->filters);
     }
 
     protected function getViewData(): array
     {
         $fields = $this->source === 'personnel' ? ['employment_group' => 'Grup'] + DashboardQuery::FILTERS : ['position_type' => 'Jenis Jabatan', 'position_class' => 'Kelas Jabatan', 'requirement_status' => 'Status Kebutuhan'];
-        $model = $this->source === 'personnel' ? PersonnelSnapshot::class : PositionRequirementSnapshot::class;
         $options = [];
         foreach ($fields as $field => $label) {
-            $options[$field] = $model::where('reporting_period_id', $this->periodId)->whereNotNull($field)->distinct()->orderBy($field)->pluck($field)->all();
+            $options[$field] = ($this->source === 'personnel' ? PersonnelSnapshot::where('reporting_period_id', $this->periodId) : PositionDataset::exportSnapshots($this->positionVersionId))->whereNotNull($field)->distinct()->orderBy($field)->pluck($field)->all();
         }
 
-        return ['exportBlockedReason' => app(\App\Domain\Export\ExportEligibility::class)->reason(ReportingPeriod::find($this->periodId), $this->source, $this->filters), 'periods' => ReportingPeriod::orderByDesc('period_month')->get(), 'fields' => $fields, 'options' => $options];
+        return ['activePeriod' => ReportingPeriod::activePublished(), 'activePositionVersionId' => PositionDataset::current()->published_batch_id, 'positionVersions' => PositionDataset::exportVersions()->orderByDesc('published_at')->orderByDesc('id')->get(), 'exportBlockedReason' => app(ExportEligibility::class)->reason(ReportingPeriod::find($this->periodId), $this->source, $this->exportFilters()), 'periods' => ReportingPeriod::orderByDesc('period_month')->get(), 'fields' => $fields, 'options' => $options];
     }
 }
