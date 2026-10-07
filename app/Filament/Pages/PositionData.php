@@ -58,7 +58,7 @@ class PositionData extends Page implements HasTable
         foreach ($fields as $field => $label) {
             $columns[] = TextColumn::make($field)->label($label)->placeholder('-')->sortable()->searchable()->toggleable();
         }
-        foreach (PositionProjectionValue::whereHas('snapshot', fn ($query) => $query->whereIn('id', PositionDataset::snapshots(false)->select('id')))->select('metric_type', 'projection_year')->distinct()->orderBy('metric_type')->orderBy('projection_year')->get() as $projection) {
+        foreach (PositionProjectionValue::whereHas('snapshot', fn ($query) => $query->whereIn('id', PositionDataset::snapshots()->select('id')))->select('metric_type', 'projection_year')->distinct()->orderBy('metric_type')->orderBy('projection_year')->get() as $projection) {
             $metric = $projection->metric_type;
             $year = (int) $projection->projection_year;
             $columns[] = TextColumn::make('projection_'.$metric.'_'.$year)
@@ -68,11 +68,11 @@ class PositionData extends Page implements HasTable
         }
         $filters = [];
         foreach (['position_type' => 'Jenis Jabatan', 'position_class' => 'Kelas', 'requirement_status' => 'Status'] as $field => $label) {
-            $filters[] = SelectFilter::make($field)->label($label)->options(fn () => PositionDataset::snapshots(false)->whereNotNull($field)->distinct()->pluck($field, $field)->all());
+            $filters[] = SelectFilter::make($field)->label($label)->options(fn () => PositionDataset::snapshots()->whereNotNull($field)->distinct()->pluck($field, $field)->all());
         }
 
         $columns[] = TextColumn::make('extra_data')->label('Data tambahan')->getStateUsing(fn ($record) => collect($record->extra_data ?? [])->map(fn ($item) => $item['label'].': '.($item['value'] ?? '-'))->values()->all())->listWithLineBreaks()->wrap()->toggleable();
 
-        return $table->query(PositionDataset::snapshots(false)->with('projections'))->columns($columns)->filters($filters)->deferFilters(false)->defaultSort('vacancy_count', 'desc')->emptyStateHeading('Belum ada peta jabatan');
+        return $table->query(PositionDataset::snapshots()->with('projections'))->columns($columns)->filters($filters)->deferFilters(false)->defaultSort('vacancy_count', 'desc')->emptyStateHeading('Belum ada peta jabatan');
     }
 }

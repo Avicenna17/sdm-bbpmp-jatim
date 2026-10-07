@@ -50,8 +50,9 @@ class PositionDocumentationTest extends TestCase
             $this->assertDatabaseHas('position_requirement_snapshots', ['source_sequence' => 7, 'retirement_age' => 60, 'retirement_5y_total' => 2]);
             $this->assertDatabaseHas('position_projection_values', ['metric_type' => 'RETIREMENT', 'projection_year' => 2045, 'value' => 0]);
             $this->assertDatabaseHas('position_projection_values', ['metric_type' => 'REQUIREMENT', 'projection_year' => 2050, 'value' => 9]);
-            Livewire::test(PositionData::class)->assertSee('Pensiun 2045')->assertSee('Proyeksi Kebutuhan 2050')->assertSee('Induk Contoh')->assertCanSeeTableRecords(PositionDataset::snapshots(false)->get());
+            Livewire::test(PositionData::class)->assertCanNotSeeTableRecords(PositionDataset::snapshots(false)->get());
             app(PublishPositionService::class)->publish($user, $batch->id);
+            Livewire::test(PositionData::class)->assertSee('Pensiun 2045')->assertSee('Proyeksi Kebutuhan 2050')->assertSee('Induk Contoh')->assertCanSeeTableRecords(PositionDataset::snapshots()->get());
             $csv = $this->get('/exports/positions/csv?period_id='.$period->id)->assertOk()->streamedContent();
             $this->assertStringContainsString('Usia Pensiun', $csv);
             $this->assertStringContainsString('Total Pensiun 5 Tahun', $csv);
@@ -81,6 +82,7 @@ class PositionDocumentationTest extends TestCase
             ]);
         }
         PositionDataset::current()->update(['draft_batch_id' => $batch->id]);
+        app(PublishPositionService::class)->publish($user, $batch->id);
         $this->actingAs($user);
         $page = Livewire::test(PositionData::class);
         $summary = $page->instance()->positionSummary();
@@ -98,6 +100,49 @@ class PositionDocumentationTest extends TestCase
         $page->searchTable('Tidak ditemukan');
         $this->assertEmpty($page->instance()->positionSummary()['series']['RETIREMENT']);
         $page->assertSee('Belum ada data yang sesuai');
+    }
+
+    public function test_admin_table_filters_projections_and_charts_only_use_active_version(): void
+    {
+        $this->seed();
+        $user = User::factory()->create()->assignRole('Super Admin');
+        $this->actingAs($user);
+        $makeVersion = function (string $name, string $type, int $year, int $value) use ($user) {
+            $batch = ImportBatch::create(['uploaded_by' => $user->id, 'source_type' => WorkbookParser::POSITION,
+                'original_filename' => $name.'.xlsx', 'sha256' => hash('sha256', $name), 'path' => $name.'.xlsx',
+                'disk' => 'local', 'status' => 'committed', 'base_revision' => 0]);
+            $record = PositionRequirementSnapshot::create(['import_batch_id' => $batch->id,
+                'position_key' => hash('sha256', $name), 'position_name' => $name, 'position_type' => $type,
+                'source_row_no' => 2, 'raw_payload' => []]);
+            $record->projections()->create(['metric_type' => 'REQUIREMENT', 'projection_year' => $year, 'value' => $value]);
+
+            return [$batch, $record];
+        };
+        [$active, $activeRecord] = $makeVersion('Versi Awal', 'Fungsional', 2040, 3);
+        PositionDataset::current()->update(['draft_batch_id' => $active->id]);
+        $empty = Livewire::test(PositionData::class)->assertCanNotSeeTableRecords([$activeRecord]);
+        $this->assertEmpty($empty->instance()->positionSummary()['records']);
+        $this->assertSame([], $empty->instance()->getTable()->getFilter('position_type')->getOptions());
+        $empty->assertDontSee('Proyeksi Kebutuhan 2040');
+
+        app(PublishPositionService::class)->publish($user, $active->id);
+        [$draft, $draftRecord] = $makeVersion('Versi Pengganti', 'Struktural', 2050, 9);
+        PositionDataset::current()->update(['draft_batch_id' => $draft->id]);
+        $page = Livewire::test(PositionData::class)->assertCanSeeTableRecords([$activeRecord])
+            ->assertCanNotSeeTableRecords([$draftRecord])->assertSee('Proyeksi Kebutuhan 2040')
+            ->assertDontSee('Proyeksi Kebutuhan 2050');
+        $this->assertSame(['Fungsional' => 'Fungsional'], $page->instance()->getTable()->getFilter('position_type')->getOptions());
+        $this->assertEquals(3, $page->instance()->positionSummary()['series']['REQUIREMENT'][2040]['value']);
+        $this->assertArrayNotHasKey(2050, $page->instance()->positionSummary()['series']['REQUIREMENT']);
+        $page->searchTable('Versi Pengganti');
+        $this->assertEmpty($page->instance()->positionSummary()['records']);
+
+        app(PublishPositionService::class)->publish($user, $draft->id);
+        $updated = Livewire::test(PositionData::class)->assertCanSeeTableRecords([$draftRecord])
+            ->assertCanNotSeeTableRecords([$activeRecord])->assertSee('Proyeksi Kebutuhan 2050')
+            ->assertDontSee('Proyeksi Kebutuhan 2040');
+        $this->assertSame(['Struktural' => 'Struktural'], $updated->instance()->getTable()->getFilter('position_type')->getOptions());
+        $this->assertEquals(9, $updated->instance()->positionSummary()['series']['REQUIREMENT'][2050]['value']);
     }
 
     public function test_actual_position_workbook_retains_all_24_columns(): void
