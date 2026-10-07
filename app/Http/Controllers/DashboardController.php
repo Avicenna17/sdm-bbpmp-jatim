@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Dashboard\DashboardQuery;
+use App\Models\PositionDataset;
 use App\Models\ReportingPeriod;
 use Illuminate\Http\Request;
 
@@ -17,8 +18,9 @@ class DashboardController extends Controller
         if (isset($filters['period']) && ! $period) {
             abort(404);
         }
-        $data = $period ? $query->get($period, $filters) : null;
+        $positionState = PositionDataset::current();
+        $data = $period || $positionState->published_batch_id ? $query->get($period, $filters) : null;
 
-        return response()->view('dashboard', compact('periods', 'period', 'data', 'filters'))->header('Cache-Control', 'no-store');
+        return response()->view('dashboard', compact('periods', 'period', 'data', 'filters', 'positionState'))->header('Cache-Control', 'no-store');
     }
 }

@@ -10,9 +10,9 @@
 
 ## Keputusan publikasi
 
-Periode baru hanya dapat dipublikasikan setelah kedua sumber mempunyai snapshot. Commit menggunakan transaksi dan lock baris periode. Revisi periode published mempertahankan publikasi dan mengganti satu sumber secara atomik; hanya permission `period.revise` (Super Admin default) yang dapat melakukannya. Ini mengikuti opsi MVP pada database.md §16, bukan penyimpanan versi draft terpisah.
+DUK dapat dipublikasikan setelah snapshot pegawai bulan tersebut tersedia. Peta Jabatan menggunakan versi independen dengan pointer versi tersimpan dan versi publik pada `position_datasets`; publikasi Peta Jabatan tidak menunggu DUK. Rincian migrasi, status aktif/arsip, dan penomoran versi ada pada [panduan publikasi](publikasi-duk-dan-peta-jabatan.md).
 
-Preview menyimpan nomor revision periode. Commit preview lama ditolak jika commit/publish lain sudah mengubah revision. File identik dengan batch aktif menjadi no-op; file identik dengan batch historis boleh diimport kembali sebagai rollback. Histori batch tidak dihapus.
+Commit memakai transaksi dan lock pada periode DUK atau dataset Peta Jabatan. Revision masing-masing sumber mencegah commit preview yang kedaluwarsa tanpa saling menghalangi. Revisi DUK terpublikasi tetap memerlukan `period.revise`; versi Peta Jabatan baru disimpan sebagai draft sampai dipublikasikan. Nomor versi diberikan hanya saat impor Peta Jabatan berhasil disimpan. Histori batch dan versi tidak dihapus.
 
 ## Import dan batas validasi
 

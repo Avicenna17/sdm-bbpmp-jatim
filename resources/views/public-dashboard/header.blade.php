@@ -40,7 +40,7 @@
                     </div>
 
                     <!-- Login Admin CTA -->
-                    <a href="/admin" class="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-900 to-indigo-900 hover:from-blue-800 hover:to-indigo-800 text-white text-xs sm:text-sm font-semibold shadow-md shadow-blue-950/15 hover:shadow-lg hover:shadow-blue-900/25 transition-all duration-200 transform hover:-translate-y-0.5">
+                    <a href="{{ route('filament.admin.auth.login') }}" class="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-900 to-indigo-900 hover:from-blue-800 hover:to-indigo-800 text-white text-xs sm:text-sm font-semibold shadow-md shadow-blue-950/15 hover:shadow-lg hover:shadow-blue-900/25 transition-all duration-200 transform hover:-translate-y-0.5">
                         <svg class="w-4 h-4 text-amber-400 group-hover:rotate-12 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                         </svg>

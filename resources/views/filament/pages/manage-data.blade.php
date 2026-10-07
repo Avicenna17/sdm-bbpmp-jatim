@@ -4,21 +4,46 @@
 
 @if($errors->any())<x-filament::section><ul class="sdm-error">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></x-filament::section>@endif
 
-<x-filament::section heading="Periode pelaporan" description="Pilih bulan pelaporan, unggah file, lalu simpan hasilnya.">
+<style>
+.sdm-workspaces{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #cbd5e1;gap:24px}.sdm-workspace{display:flex;align-items:center;gap:14px;text-align:left;padding:18px 4px;border-bottom:3px solid transparent;margin-bottom:-1px;color:#64748b;transition:color .15s,border-color .15s}.sdm-workspace[aria-selected="true"]{border-color:#059669;color:#047857}.sdm-workspace:hover{color:#047857}.sdm-workspace:focus-visible{outline:2px solid #059669;outline-offset:4px;border-radius:6px}.sdm-workspace-icon{width:44px;height:44px;flex-shrink:0;border:1px solid #e2e8f0;border-radius:12px;display:grid;place-items:center;background:#fff}.sdm-workspace-icon svg{width:23px;height:23px}.sdm-workspace[aria-selected="true"] .sdm-workspace-icon{background:#ecfdf5;border-color:#a7f3d0}.sdm-workspace strong{display:block;font-size:16px}.sdm-workspace small{display:block;margin-top:4px;font-size:12px;color:#64748b}.sdm-tab-panel{display:grid;gap:24px}.sdm-result{margin-top:24px;padding-top:24px;border-top:1px solid #e2e8f0}.dark .sdm-workspace-icon{background:#18181b;border-color:#3f3f46}.dark .sdm-workspace[aria-selected="true"]{color:#6ee7b7}.dark .sdm-workspace[aria-selected="true"] .sdm-workspace-icon{background:#064e3b;border-color:#059669}.dark .sdm-workspace small,.dark .sdm-muted{color:#a1a1aa}.dark .sdm-input{background:#18181b;color:#fafafa;border-color:#52525b}@media(max-width:600px){.sdm-workspaces{gap:12px}.sdm-workspace{align-items:flex-start;gap:8px;padding:14px 0}.sdm-workspace-icon{display:none}.sdm-workspace strong{font-size:14px}}
+</style>
+<div class="sdm-workspaces" role="tablist" aria-label="Jenis data yang dikelola" x-on:keydown.right.prevent="$event.target.closest('[role=tab]').nextElementSibling?.focus()" x-on:keydown.left.prevent="$event.target.closest('[role=tab]').previousElementSibling?.focus()">
+    @foreach(['PERSONNEL_DUK'=>['DUK Pegawai','Periode pelaporan bulanan','heroicon-o-users'], 'POSITION_REQUIREMENT'=>['Peta Jabatan / Kebutuhan','Pembaruan sesuai kebutuhan','heroicon-o-building-office-2']] as $key => [$label,$description,$icon])
+    <button type="button" class="sdm-workspace" role="tab" id="source-tab-{{ $key }}" aria-controls="source-panel" aria-selected="{{ $source === $key ? 'true' : 'false' }}" wire:click="selectSource('{{ $key }}')" wire:loading.attr="disabled" wire:target="selectSource,file,preview,saveImport,revalidate,publish,publishPositions">
+        <span class="sdm-workspace-icon"><x-filament::icon :icon="$icon" /></span><span><strong>{{ $label }}</strong><small>{{ $description }}</small></span>
+    </button>
+    @endforeach
+</div>
+<div id="source-panel" role="tabpanel" aria-labelledby="source-tab-{{ $source }}" class="sdm-tab-panel" wire:key="source-panel-{{ $source }}">
+@if($source === 'PERSONNEL_DUK')
+<x-filament::section heading="Periode DUK Pegawai" description="Pilih bulan pelaporan untuk DUK Pegawai.">
 
-<div class="sdm-grid"><div><label class="sdm-label" for="period">Pilih periode</label><select id="period" class="sdm-input" wire:model.live="periodId"><option value="">Pilih periode</option>@foreach($periods as $p)<option value="{{ $p->id }}">{{ $p->label }} · {{ ['draft'=>'Belum lengkap','ready'=>'Siap dipublikasikan','published'=>'Dipublikasikan'][$p->status] ?? $p->status }}</option>@endforeach</select></div>@can('period.create')<form wire:submit="createPeriod"><label class="sdm-label" for="month">Buat periode baru</label><div class="sdm-actions" style="margin:0"><input id="month" class="sdm-input" style="width:auto" type="month" wire:model="month" required><x-filament::button type="submit">Buat periode</x-filament::button></div></form>@endcan</div>
+<div class="sdm-grid"><div><label class="sdm-label" for="period">Pilih periode</label><select id="period" class="sdm-input" wire:model.live="periodId"><option value="">Pilih periode</option>@foreach($periods as $p)<option value="{{ $p->id }}">{{ $p->label }} · {{ $p->publicationLabel($activePeriod) }}</option>@endforeach</select></div>@can('period.create')<form wire:submit="createPeriod"><label class="sdm-label" for="month">Buat periode baru</label><div class="sdm-actions" style="margin:0"><input id="month" class="sdm-input" style="width:auto" type="month" wire:model="month" required><x-filament::button type="submit">Buat periode</x-filament::button></div></form>@endcan</div>
 
-@if($period)<div class="sdm-grid" style="margin-top:24px"><div><span class="sdm-muted">Status periode</span><div class="sdm-stat">{{ ['draft'=>'Belum lengkap','ready'=>'Siap dipublikasikan','published'=>'Dipublikasikan'][$period->status] ?? $period->status }}</div></div><div><span class="sdm-muted">Pegawai tersimpan</span><div class="sdm-stat">{{ $period->personnel()->count() }}</div></div><div><span class="sdm-muted">Peta jabatan</span><div class="sdm-stat">{{ $period->positions()->count() }}</div></div></div><div class="sdm-actions">@can('period.publish')<x-filament::button wire:click="publish" wire:confirm="Publikasikan data periode ini ke dashboard publik?" :disabled="$period->status === 'draft'">Publikasikan periode</x-filament::button>@endcan<x-filament::button tag="a" href="/" color="gray" target="_blank">Lihat dashboard publik ↗</x-filament::button></div>@endif
+@if($period)<div class="sdm-grid" style="margin-top:24px"><div><span class="sdm-muted">Status periode</span><div class="sdm-stat">{{ $period->publicationLabel($activePeriod) }}</div></div><div><span class="sdm-muted">Pegawai tersimpan</span><div class="sdm-stat">{{ $period->personnel()->count() }}</div></div><div><span class="sdm-muted">Terakhir dipublikasikan</span><div class="sdm-stat">{{ $period->published_at ? $period->published_at->timezone('Asia/Jakarta')->format('d/m/Y H:i').' WIB' : 'Belum dipublikasikan' }}</div></div></div><div class="sdm-actions">@can('period.publish')<x-filament::button wire:click="publish" wire:confirm="Publikasikan data periode ini ke dashboard publik?" :disabled="!$period->canPublish($activePeriod)">Publikasikan DUK</x-filament::button>@endcan<x-filament::button tag="a" href="{{ route('dashboard') }}" color="gray" target="_blank">Lihat dashboard publik ↗</x-filament::button></div>@endif
 
 </x-filament::section>
+@else
+<x-filament::section heading="Status Peta Jabatan / Kebutuhan" description="Tidak terikat periode. Import baru disimpan sebagai versi yang perlu dipublikasikan.">
+<div class="sdm-grid">
+    <div><span class="sdm-muted">Status data</span><div class="sdm-stat">{{ !$positionState->draft_batch_id ? 'Belum ada data' : ($positionState->draft_batch_id === $positionState->published_batch_id ? 'Aktif di dashboard' : 'Siap dipublikasikan') }}</div></div>
+    <div><span class="sdm-muted">Jabatan tersimpan</span><div class="sdm-stat">{{ $positionCount }}</div></div>
+    <div><span class="sdm-muted">Terakhir dipublikasikan</span><div class="sdm-stat">{{ $positionState->published_at ? $positionState->published_at->timezone('Asia/Jakarta')->format('d/m/Y H:i').' WIB' : 'Belum dipublikasikan' }}</div></div>
+</div>
+<div class="sdm-actions">
+    @can('period.publish')<x-filament::button wire:click="publishPositions({{ $positionState->draft_batch_id ?? 0 }})" wire:confirm="Publikasikan Peta Jabatan tersimpan ini ke dashboard publik?" :disabled="!$positionState->draft_batch_id || $positionState->draft_batch_id === $positionState->published_batch_id">Publikasikan Peta Jabatan</x-filament::button>@endcan
+    <x-filament::button tag="a" href="{{ route('dashboard') }}#duk-rekap-section" color="gray" target="_blank">Lihat dashboard publik ↗</x-filament::button>
+</div>
+</x-filament::section>
+@endif
 
-@can('import.create')<x-filament::section heading="Import data" description="XLS/XLSX, maksimal 15 MB. Koreksi dilakukan pada sumber kemudian import ulang."><form wire:submit="preview"><div class="sdm-grid"><div><label class="sdm-label" for="source">Sumber</label><select class="sdm-input" id="source" wire:model.live="source"><option value="PERSONNEL_DUK">DUK Pegawai</option><option value="POSITION_REQUIREMENT">Peta Jabatan / Kebutuhan</option></select></div><div><label class="sdm-label" for="file">File Excel</label><input class="sdm-input" type="file" id="file" wire:model="file" accept=".xls,.xlsx" required><span wire:loading wire:target="file" class="sdm-muted">Mengunggah file…</span></div></div><div style="margin-top:16px"><label class="sdm-label">Versi template<select class="sdm-input" wire:model.live="templateVersionId"><option value="">Kenali otomatis</option><option value="0">Format bawaan lama (tanpa kolom tambahan)</option>@foreach($templateVersions as $v)<option value="{{ $v->id }}">Versi {{ $v->number }}{{ $v->template->active_version_id===$v->id?' (aktif)':'' }}</option>@endforeach</select></label><p class="sdm-muted">File unduhan baru membawa penanda versi. Pilih versi secara manual jika file tidak memiliki penanda. Gunakan versi template untuk perubahan nama atau penambahan kolom.</p></div>
+@if(Gate::allows('import.create') || $batch)<x-filament::section heading="Import data" description="XLS/XLSX, maksimal 15 MB. Koreksi dilakukan pada sumber kemudian import ulang.">@can('import.create')<form wire:submit="preview"><div class="sdm-grid"><div><label class="sdm-label" for="file">File Excel</label><input class="sdm-input" type="file" id="file" wire:model="file" accept=".xls,.xlsx" required><span wire:loading wire:target="file" class="sdm-muted">Mengunggah file…</span></div></div><div style="margin-top:16px"><label class="sdm-label">Versi template<select class="sdm-input" wire:model.live="templateVersionId"><option value="">Kenali otomatis</option><option value="0">Format bawaan lama (tanpa kolom tambahan)</option>@foreach($templateVersions as $v)<option value="{{ $v->id }}">Versi {{ $v->number }}{{ $v->template->active_version_id===$v->id?' (aktif)':'' }}</option>@endforeach</select></label><p class="sdm-muted">File unduhan baru membawa penanda versi. Pilih versi secara manual jika file tidak memiliki penanda. Gunakan versi template untuk perubahan nama atau penambahan kolom.</p></div>
 @if($selectedTemplate)<details style="margin-top:16px"><summary>Sesuaikan pemetaan jika judul kolom Excel berbeda</summary><p class="sdm-muted">Isi nama persis kolom dalam file. Biarkan kosong jika sama dengan template. Kolom baru harus didaftarkan melalui Template Import sebelum dapat disimpan.</p><div class="sdm-grid">@foreach($selectedTemplate->definition['columns'] as $c)<label>{{ $c['label'] }}<input class="sdm-input" placeholder="{{ $c['label'] }}" wire:model="templateMapping.{{ $c['key'] }}"></label>@endforeach</div><label>Kolom yang sengaja diabaikan (satu judul per baris)<textarea class="sdm-input" wire:model="ignoredColumns"></textarea></label><p class="sdm-muted">Nilai kolom yang diabaikan tidak disimpan sebagai data terstruktur. Pastikan memang tidak diperlukan.</p></details>@endif
-<div class="sdm-actions"><x-filament::button type="submit" wire:loading.attr="disabled" wire:target="file,preview">Periksa file</x-filament::button><x-filament::button tag="a" color="gray" href="{{ route('templates',['source'=>'personnel','period_id'=>$periodId]) }}">Unduh template DUK</x-filament::button><x-filament::button tag="a" color="gray" href="{{ route('templates',['source'=>'positions','period_id'=>$periodId]) }}">Unduh template Peta Jabatan</x-filament::button></div><p wire:loading wire:target="preview" class="sdm-muted">Membaca dan memvalidasi workbook…</p></form></x-filament::section>@endcan
+<div class="sdm-actions"><x-filament::button type="submit" wire:loading.attr="disabled" wire:target="file,preview">Periksa file</x-filament::button><x-filament::button tag="a" color="gray" href="{{ route('templates', $source === 'PERSONNEL_DUK' ? ['source'=>'personnel','period_id'=>$periodId] : ['source'=>'positions']) }}">{{ $source === 'PERSONNEL_DUK' ? 'Unduh template DUK' : 'Unduh template Peta Jabatan' }}</x-filament::button></div><p wire:loading wire:target="preview" class="sdm-muted">Membaca dan memvalidasi workbook…</p></form>@endcan
 
 @if($batch)
 
-<x-filament::section heading="Hasil pemeriksaan file" :description="$batch->original_filename.' · '.$batch->status_label">
+<div class="sdm-result" id="import-result"><h3 style="font-weight:600">Hasil pemeriksaan file</h3><p class="sdm-muted" style="margin:8px 0 20px">{{ $batch->original_filename }} · {{ $batch->status_label }}</p>
 
     @if($batch->template_version_id)<p>Versi template: {{ \App\Models\ImportTemplateVersion::find($batch->template_version_id)?->number }}</p><details><summary>Pemetaan kolom yang digunakan</summary><ul>@foreach($batch->summary['template_mapping']??[] as $m)<li>{{ $m['label'] }} (kolom {{ $m['column'] }}) &rarr; {{ $m['target']??$m['label'] }}</li>@endforeach</ul>@if($batch->summary['ignored_columns']??[])<p>Diabaikan: {{ implode(', ', $batch->summary['ignored_columns']) }}</p>@endif</details>@endif
     <div class="sdm-grid">
@@ -38,7 +63,7 @@
 
         <div class="sdm-actions">
 
-            @foreach(['new'=>'Data baru','changed'=>'Diperbarui','unchanged'=>'Tidak berubah','removed'=>'Dihapus dari periode ini'] as $key=>$label)
+            @foreach(['new'=>'Data baru','changed'=>'Diperbarui','unchanged'=>'Tidak berubah','removed'=>'Tidak ada pada versi baru'] as $key=>$label)
 
                 <span>{{ $label }}: <strong>{{ $batch->summary[$key]??0 }}</strong></span>
 
@@ -50,7 +75,7 @@
 
         <div class="sdm-actions">
 
-            <x-filament::button wire:click="saveImport" wire:confirm="Simpan hasil import untuk periode {{ $batch->period->label }}? Data dari sumber yang sama pada periode ini akan diganti dengan isi file ini." wire:loading.attr="disabled">
+            <x-filament::button wire:click="saveImport" wire:confirm="{{ $batch->source_type === 'PERSONNEL_DUK' ? 'Ganti DUK periode '.$batch->period?->label.' dengan isi file ini?' : 'Simpan versi Peta Jabatan ini? Data publik tetap memakai versi sebelumnya sampai dipublikasikan.' }}" wire:loading.attr="disabled">
 
                 <span wire:loading.remove wire:target="saveImport">Simpan data</span>
 
@@ -64,7 +89,7 @@
 
     @elseif($batch->status==='committed')
 
-        <p style="margin-top:16px"><strong>Data berhasil disimpan</strong> pada {{ $batch->committed_at?->format('d/m/Y H:i') }} untuk periode {{ $batch->period->label }}.</p>
+        <p style="margin-top:16px"><strong>Data berhasil disimpan</strong> pada {{ $batch->committed_at?->format('d/m/Y H:i') }} {{ $batch->source_type === 'PERSONNEL_DUK' ? 'untuk periode '.$batch->period?->label : 'sebagai versi Peta Jabatan' }}.</p>
 
         @if($batch->source_type==='PERSONNEL_DUK')
 
@@ -72,7 +97,7 @@
 
         @else
 
-            @can('position_requirement.view')<div class="sdm-actions"><x-filament::button tag="a" :href="\App\Filament\Pages\PositionData::getUrl(['tableFilters'=>['reporting_period_id'=>['value'=>$batch->reporting_period_id]]])">Lihat Peta Jabatan</x-filament::button></div>@endcan
+            @can('position_requirement.view')<div class="sdm-actions"><x-filament::button tag="a" :href="\App\Filament\Pages\PositionData::getUrl()">Lihat Peta Jabatan</x-filament::button></div>@endcan
         @endif
 
     @else
@@ -131,10 +156,12 @@
 
     @endif@endcan
 
+</div>
+@endif
 </x-filament::section>
-
 @endif
 
-@can('import.view')<x-filament::section heading="Histori import" description="30 import terbaru pada periode terpilih."><div class="sdm-scroll"><table class="sdm-table"><thead><tr><th>File</th><th>Pengunggah</th><th>Status</th><th>Waktu</th><th></th></tr></thead><tbody>@forelse($history as $item)<tr><td>{{ $item->original_filename }}<br><small>{{ $item->source_label }}</small></td><td>{{ $item->uploader->name }}</td><td>{{ $item->status_label }}</td><td>{{ $item->created_at->format('d/m/Y H:i') }}</td><td><x-filament::button size="xs" color="gray" wire:click="inspect({{ $item->id }})">Detail</x-filament::button></td></tr>@empty<tr><td colspan="5">Belum ada import.</td></tr>@endforelse</tbody></table></div></x-filament::section>@endcan
+@can('import.view')<x-filament::section heading="Histori import" :description="$source === 'PERSONNEL_DUK' ? '30 import DUK terbaru pada periode terpilih.' : '30 import Peta Jabatan / Kebutuhan terbaru.'"><div class="sdm-scroll"><table class="sdm-table"><thead><tr><th>File</th><th>Pengunggah</th><th>Status</th><th>Waktu</th><th></th></tr></thead><tbody>@forelse($history as $item)<tr><td>{{ $item->original_filename }}<br><small>{{ $item->source_label }}</small></td><td>{{ $item->uploader->name }}</td><td>{{ $item->status_label }}</td><td>{{ $item->created_at->format('d/m/Y H:i') }}</td><td><x-filament::button size="xs" color="gray" wire:click="inspect({{ $item->id }})">Detail</x-filament::button></td></tr>@empty<tr><td colspan="5">Belum ada import.</td></tr>@endforelse</tbody></table></div></x-filament::section>@endcan
 
+</div>
 </x-filament-panels::page>

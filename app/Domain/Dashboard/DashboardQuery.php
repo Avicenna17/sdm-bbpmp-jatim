@@ -2,6 +2,7 @@
 
 namespace App\Domain\Dashboard;
 
+use App\Models\PositionDataset;
 use App\Models\PositionProjectionValue;
 use App\Models\ReportingPeriod;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,9 +30,10 @@ class DashboardQuery
         return (clone $query)->select($column)->selectRaw('COUNT(*) as total')->groupBy($column)->orderByDesc('total')->get()->map(fn ($r) => ['label' => $r->$column ?: 'Belum diisi', 'value' => (int) $r->total])->all();
     }
 
-    public function get(ReportingPeriod $period, array $filters): array
+    public function get(?ReportingPeriod $period, array $filters): array
     {
-        abort_unless($period->status === 'published', 404);
+        abort_unless(! $period || $period->status === 'published', 404);
+        $period ??= new ReportingPeriod;
         $query = $this->personnel($period, $filters);
         $charts = [];
         $options = [];
@@ -40,7 +42,7 @@ class DashboardQuery
             $charts[$field] = ['title' => $label, 'values' => $values];
             $options[$field] = $period->personnel()->whereNotNull($field)->distinct()->orderBy($field)->pluck($field)->all();
         }
-        $positions = $period->positions();
+        $positions = PositionDataset::snapshots();
         if (filled($filters['position_search'] ?? null)) {
             $positions->where('position_name', 'like', '%'.$filters['position_search'].'%');
         }
@@ -53,7 +55,7 @@ class DashboardQuery
             ->map(fn ($rows) => $rows->map(fn ($v) => ['label' => (string) $v->projection_year, 'value' => $v->total === null ? null : (int) $v->total, 'known' => (int) $v->known, 'expected' => $positionCount])->all())->all();
 
         return ['total' => $query->count(), 'status' => $this->breakdown($query, 'employment_status'), 'unclassified' => $period->personnel()->where('employment_group', 'UNKNOWN')->count(), 'charts' => $charts, 'options' => $options,
-            'positions' => ['count' => $positionCount, 'types' => $period->positions()->whereNotNull('position_type')->distinct()->orderBy('position_type')->pluck('position_type')->all(), 'retirement_total' => (int) (clone $positions)->sum('retirement_5y_total'), 'incumbents' => (int) (clone $positions)->sum('incumbent_count'), 'requirements' => (int) (clone $positions)->sum('requirement_count'), 'vacancies' => (int) (clone $positions)->sum('vacancy_count'),
+            'positions' => ['count' => $positionCount, 'types' => PositionDataset::snapshots()->whereNotNull('position_type')->distinct()->orderBy('position_type')->pluck('position_type')->all(), 'retirement_total' => (int) (clone $positions)->sum('retirement_5y_total'), 'incumbents' => (int) (clone $positions)->sum('incumbent_count'), 'requirements' => (int) (clone $positions)->sum('requirement_count'), 'vacancies' => (int) (clone $positions)->sum('vacancy_count'),
                 'status' => $this->breakdown($positions, 'requirement_status'), 'top' => (clone $positions)->select('position_name', 'position_type', 'position_class')->selectRaw('SUM(incumbent_count) as incumbents, SUM(requirement_count) as requirements, SUM(vacancy_count) as vacancies')->groupBy('position_name', 'position_type', 'position_class')->orderByDesc('vacancies')->orderBy('position_name')->get()->toArray(), 'projections' => $projections]];
     }
 }

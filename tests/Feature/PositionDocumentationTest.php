@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Domain\Import\ImportService;
 use App\Domain\Import\WorkbookParser;
+use App\Domain\ReportingPeriod\PublishPositionService;
 use App\Filament\Pages\PositionData;
 use App\Models\ImportBatch;
+use App\Models\PositionDataset;
 use App\Models\PositionRequirementSnapshot;
 use App\Models\ReportingPeriod;
 use App\Models\User;
@@ -35,7 +37,7 @@ class PositionDocumentationTest extends TestCase
             file_put_contents($path, $response->streamedContent());
             $book = IOFactory::load($path);
             $sheet = $book->getSheetByName('PETA JABATAN');
-            $this->assertSame('Pensiun 2035', $sheet->getCell('M1')->getValue());
+            $this->assertSame('Pensiun '.now()->year, $sheet->getCell('M1')->getValue());
             $sheet->setCellValue('M1', 'Pensiun 2045');
             $sheet->setCellValue('Y1', 'Proyeksi Kebutuhan 2050');
             $sheet->fromArray([7, 'Induk Contoh', 'Unit Contoh', 'Analis Contoh', 'Fungsional', 8, 60, 1, 4, 3, 'Kurang', 2, 0], null, 'A2', true);
@@ -48,8 +50,8 @@ class PositionDocumentationTest extends TestCase
             $this->assertDatabaseHas('position_requirement_snapshots', ['source_sequence' => 7, 'retirement_age' => 60, 'retirement_5y_total' => 2]);
             $this->assertDatabaseHas('position_projection_values', ['metric_type' => 'RETIREMENT', 'projection_year' => 2045, 'value' => 0]);
             $this->assertDatabaseHas('position_projection_values', ['metric_type' => 'REQUIREMENT', 'projection_year' => 2050, 'value' => 9]);
-            Livewire::test(PositionData::class)->assertSee('Pensiun 2045')->assertSee('Proyeksi Kebutuhan 2050')->assertSee('Induk Contoh')->assertCanSeeTableRecords($period->positions()->get());
-        $period->update(['status' => 'published']);
+            Livewire::test(PositionData::class)->assertSee('Pensiun 2045')->assertSee('Proyeksi Kebutuhan 2050')->assertSee('Induk Contoh')->assertCanSeeTableRecords(PositionDataset::snapshots(false)->get());
+            app(PublishPositionService::class)->publish($user, $batch->id);
             $csv = $this->get('/exports/positions/csv?period_id='.$period->id)->assertOk()->streamedContent();
             $this->assertStringContainsString('Usia Pensiun', $csv);
             $this->assertStringContainsString('Total Pensiun 5 Tahun', $csv);
@@ -78,6 +80,7 @@ class PositionDocumentationTest extends TestCase
                 ['metric_type' => 'REQUIREMENT', 'projection_year' => 2045, 'value' => $i === 1 ? 5 : null],
             ]);
         }
+        PositionDataset::current()->update(['draft_batch_id' => $batch->id]);
         $this->actingAs($user);
         $page = Livewire::test(PositionData::class);
         $summary = $page->instance()->positionSummary();
@@ -92,7 +95,7 @@ class PositionDocumentationTest extends TestCase
         $this->assertNull($page->instance()->positionSummary()['series']['REQUIREMENT'][2045]['value']);
         $page->searchTable('Analis 12');
         $this->assertEquals(2, $page->instance()->positionSummary()['series']['REQUIREMENT'][2041]['value']);
-        $page->filterTable('reporting_period_id', $old->id);
+        $page->searchTable('Tidak ditemukan');
         $this->assertEmpty($page->instance()->positionSummary()['series']['RETIREMENT']);
         $page->assertSee('Belum ada data yang sesuai');
     }

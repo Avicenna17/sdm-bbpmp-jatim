@@ -43,13 +43,14 @@ php artisan serve
 ## Alur penggunaan
 
 1. Login sebagai Super Admin atau Admin SDM.
-2. Buat/pilih periode pada **Periode dan Import Data**.
-3. Upload DUK (sheet `DUK PEGAWAI`), periksa preview/warning, lalu **Simpan data**.
-4. Upload Peta Jabatan, periksa preview, lalu commit. Jika ada perubahan periode selama preview, upload ulang.
-5. Setelah kedua sumber lengkap, **Publikasikan periode**.
-6. Gunakan **Daftar Pegawai**, **Peta Jabatan dan Kebutuhan**, **Export Data**, dan **Histori Import**.
+2. Pada **Periode dan Import Data**, pilih tab **DUK Pegawai**, buat/pilih bulan, unggah DUK, periksa preview, lalu **Simpan data** dan **Publikasikan DUK**.
+3. Pada tab **Peta Jabatan / Kebutuhan**, unggah file tanpa memilih bulan, periksa preview, simpan versi baru, lalu **Publikasikan Peta Jabatan** saat siap.
+4. Kedua sumber dapat dipublikasikan secara mandiri. DUK publik terbaru berlabel **Aktif di dashboard**; periode sebelumnya menjadi **Arsip** dan tetap dapat dilihat/diunduh.
+5. **Export Data** menyediakan periode DUK dan versi Peta Jabatan yang pernah dipublikasikan. Nomor versi Peta Jabatan dimulai dari 1, khusus untuk impor Peta Jabatan yang berhasil disimpan.
 
-Import ulang mengganti seluruh snapshot sumber pada periode itu; histori bulan lain tetap ada. Revisi periode terpublikasi hanya dapat dilakukan Super Admin. Untuk kembali ke versi lama, import ulang file sumber versi tersebut. File identik dengan snapshot aktif menjadi no-op.
+Import ulang DUK mengganti snapshot bulan tersebut; histori bulan lain tetap ada. Revisi DUK terpublikasi memerlukan permission `period.revise`. Peta Jabatan menyimpan snapshot per versi: versi publik sebelumnya tetap berlaku hingga versi pengganti dipublikasikan. File identik dengan snapshot tersimpan terakhir menjadi no-op.
+
+Panduan migrasi untuk instalasi yang sudah berjalan tersedia pada [publikasi DUK dan Peta Jabatan](docs/publikasi-duk-dan-peta-jabatan.md).
 
 Template XLSX tersedia di menu import. Kolom NIP harus disimpan sebagai teks 18 digit. Nama/NIP tidak dikirim oleh dashboard publik; export detail hanya untuk pengguna yang memiliki permission.
 
@@ -98,8 +99,15 @@ pnpm run build
 
 Sertakan hasil `public/build` saat deployment. Setelah mengubah Blade/CSS/JavaScript, jalankan build kembali. Lockfile disertakan agar versi dependensi konsisten.
 
-Filter kepegawaian memengaruhi total dan grafik pegawai. Filter pencarian/jenis jabatan memengaruhi ringkasan formasi, proyeksi tahunan, dan tabel peta jabatan; keduanya berbagi periode. Kolom tahunan mengikuti data import, nilai kosong tidak diubah menjadi nol, dan data parsial ditandai pada rincian angka. Dashboard publik tidak mengirim nama/NIP, file sumber, atau data periode draft.
+Filter kepegawaian memengaruhi total dan grafik pegawai. Filter pencarian/jenis jabatan memengaruhi ringkasan formasi, proyeksi tahunan, dan tabel peta jabatan; DUK mengikuti periode, sedangkan Peta Jabatan memakai versi publik aktif lintas periode. Kolom tahunan mengikuti data import, nilai kosong tidak diubah menjadi nol, dan data parsial ditandai pada rincian angka. Dashboard publik tidak mengirim nama/NIP, file sumber, atau data periode draft.
 
 ## Template Import
 
 Pengelolaan versi, editor kolom, preview, uji contoh file, serta pemetaan import dijelaskan pada [panduan Template Import](docs/TEMPLATE-IMPORT.md). Setelah memperbarui kode, jalankan migrasi sebelum membuka menu baru.
+
+
+### Grafik kosong pada lingkungan lokal
+
+Untuk `php artisan serve`, gunakan `APP_URL=http://127.0.0.1:8000` dan biarkan `ASSET_URL=` kosong di `.env`. Dengan demikian, CSS dan JavaScript Vite dilayani dari host lokal yang sedang dibuka. Jangan menyalin `ASSET_URL` produksi ke konfigurasi lokal: JavaScript bertipe module lintas domain dapat ditolak browser, meskipun CSS dan angka ringkasan masih tampil.
+
+Setelah mengubah konfigurasi, jalankan `php artisan config:clear`, lalu `pnpm run build`. Pastikan URL script pada dashboard mengarah ke `/build/assets/` di host lokal. Di server produksi subdirektori, tetap gunakan konfigurasi server yang sesuai, misalnya `APP_URL=https://lpmp-jatim.net/sdm` dan `ASSET_URL=https://lpmp-jatim.net/sdm`, serta unggah hasil build yang dibuat dengan konfigurasi produksi tersebut. Jangan mengunggah `.env` lokal ke server.

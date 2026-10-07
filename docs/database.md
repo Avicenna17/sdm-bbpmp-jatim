@@ -1,3 +1,5 @@
+> **Dokumen desain awal.** Ketentuan periode/publikasi Peta Jabatan pada dokumen ini telah digantikan oleh [panduan publikasi mandiri](publikasi-duk-dan-peta-jabatan.md). Gunakan migrasi Laravel sebagai acuan skema terkini.
+
 # Database Design
 ## Dashboard Monitoring SDM BBPMP Provinsi Jawa Timur
 
