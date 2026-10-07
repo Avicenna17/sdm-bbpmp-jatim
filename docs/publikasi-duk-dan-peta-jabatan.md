@@ -6,7 +6,7 @@
 - Peta Jabatan/Kebutuhan tidak memerlukan periode. Unggah, periksa, simpan versi baru, lalu pilih **Publikasikan Peta Jabatan**.
 - Menyimpan versi Peta Jabatan tidak langsung mengganti data publik. Versi publik sebelumnya tetap berlaku sampai versi pengganti dipublikasikan.
 - Peta Jabatan terbaru berlaku pada semua pilihan periode DUK. Data ini bukan rekonstruksi historis Peta Jabatan pada bulan DUK yang dipilih.
-- Halaman admin Peta Jabatan menampilkan versi tersimpan terbaru. Dashboard menampilkan versi aktif. Ekspor menggunakan versi aktif sebagai pilihan awal dan menyediakan versi publik terdahulu sebagai arsip.
+- Halaman admin Peta Jabatan dan dashboard hanya menampilkan versi aktif yang sudah dipublikasikan, termasuk tabel, grafik, pilihan filter, dan kolom tahun proyeksi. Draft dikelola melalui Periode dan Import Data; menyimpan draft tidak mengubah halaman Peta Jabatan. Ekspor menggunakan versi aktif sebagai pilihan awal dan menyediakan versi publik terdahulu sebagai arsip.
 - Peta Jabatan tetap bisa ditampilkan dan diekspor saat belum ada DUK atau periode yang dipublikasikan.
 - Riwayat impor dan snapshot versi Peta Jabatan dipertahankan. Preview lama dengan aturan periode harus diperiksa ulang sebelum disimpan.
 - Hak publikasi memakai izin `period.publish` yang sudah tersedia untuk Super Admin dan Admin SDM. Publikasi versi baru Peta Jabatan adalah pembaruan rutin; tidak memerlukan izin revisi periode DUK.
