@@ -20,8 +20,16 @@ class DatabaseSeeder extends Seeder
         foreach ($permissions as $name) {
             Permission::findOrCreate($name, 'web');
         }
-        Role::findOrCreate('Super Admin', 'web')->syncPermissions($permissions);
-        Role::findOrCreate('Admin SDM', 'web')->syncPermissions(array_diff($permissions, ['user.manage', 'role.manage', 'period.revise']));
-        Role::findOrCreate('Internal Viewer', 'web')->syncPermissions(['template.view', 'period.view', 'personnel.view', 'position_requirement.view', 'export.personnel', 'export.position_requirement']);
+        $this->syncSdm('Super Admin', $permissions);
+        $this->syncSdm('Admin SDM', array_diff($permissions, ['user.manage', 'role.manage', 'period.revise']));
+        $this->syncSdm('Internal Viewer', ['template.view', 'period.view', 'personnel.view', 'position_requirement.view', 'export.personnel', 'export.position_requirement']);
+        $this->call([PakPermissionSeeder::class, FunctionalMasterSeeder::class]);
+    }
+
+    private function syncSdm(string $name, array $permissions): void
+    {
+        $role = Role::findOrCreate($name, 'web');
+        $explicit = $role->permissions()->where('name', 'like', 'pak.%')->pluck('name')->all();
+        $role->syncPermissions(array_merge($permissions, $explicit));
     }
 }
