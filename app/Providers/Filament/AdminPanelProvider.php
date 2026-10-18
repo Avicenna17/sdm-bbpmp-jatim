@@ -3,6 +3,10 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Login;
+use App\Filament\Pages\InternalLanding;
+use App\Filament\Support\InternalModuleNavigation;
+use App\Http\Middleware\EnsureInternalModuleAccess;
+use App\Http\Middleware\EnsureUserIsActive;
 use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -23,13 +27,17 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return $panel->default()->id('admin')->path('admin')->login(Login::class)->brandName('SDM · BBPMP Jawa Timur')->colors(['primary' => Color::Emerald])->font('Inter', provider: LocalFontProvider::class)
+        return $panel->default()->id('admin')->path('admin')->login(Login::class)->brandName('BBPMP Jawa Timur')->colors(['primary' => Color::Emerald])->font('Inter', provider: LocalFontProvider::class)
             ->sidebarFullyCollapsibleOnDesktop()
             ->renderHook(PanelsRenderHook::HEAD_END, fn () => view('filament.partials.admin-styles'))
             ->navigationGroups(['Data Master', 'Pengelolaan Data', 'Manajemen Pengguna'])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
+            ->discoverResources(in: app_path('Filament/Pak/Resources'), for: 'App\\Filament\\Pak\\Resources')
+            ->discoverPages(in: app_path('Filament/Pak/Pages'), for: 'App\\Filament\\Pak\\Pages')
+            ->navigation(fn () => app(InternalModuleNavigation::class)->build())
+            ->homeUrl(fn () => InternalLanding::getUrl(panel: 'admin'))
             ->middleware([EncryptCookies::class, AddQueuedCookiesToResponse::class, StartSession::class, AuthenticateSession::class, ShareErrorsFromSession::class, VerifyCsrfToken::class, SubstituteBindings::class, DisableBladeIconComponents::class, DispatchServingFilamentEvent::class])
-            ->authMiddleware([Authenticate::class]);
+            ->authMiddleware([EnsureUserIsActive::class, Authenticate::class, EnsureInternalModuleAccess::class], isPersistent: true);
     }
 }

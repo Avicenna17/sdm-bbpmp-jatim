@@ -1,3 +1,5 @@
+> **Historical / superseded (internal panel only):** Desain dua panel /admin + /pak, PakPanelProvider, dan permission Super Admin sebelum corrective workspace di dokumen ini tidak lagi berlaku. Kontrak aktif: [Internal Module Workspace Architecture](../internal-workspaces.md). Hasil test lama tetap dipertahankan sebagai histori; schema/domain dan pending business rules tidak berubah.
+
 # PLAN Phase 01 — PAK Foundation
 **Status: approved for implementation, terbatas pada Phase 01.**
 

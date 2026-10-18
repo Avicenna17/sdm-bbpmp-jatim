@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Filament\Support\InternalModuleAccess;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -20,7 +21,10 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->can('period.view');
+        return $this->is_active && match ($panel->getId()) {
+            'admin' => (bool) app(InternalModuleAccess::class)->accessible($this),
+            default => false,
+        };
     }
 
     /**
@@ -28,6 +32,13 @@ class User extends Authenticatable implements FilamentUser
      *
      * @var list<string>
      */
+    public function person()
+    {
+        return $this->belongsTo(Person::class);
+    }
+
+    protected $attributes = ['is_active' => true];
+
     protected $fillable = [
         'name',
         'email',
@@ -52,6 +63,7 @@ class User extends Authenticatable implements FilamentUser
     protected function casts(): array
     {
         return [
+            'is_active' => 'boolean',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];

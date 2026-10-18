@@ -573,3 +573,7 @@ CASE_COMPLETED
 4. Prosedur formal koreksi dokumen yang sudah ditandatangani.
 
 Implementation plan wajib menandai area ini dan tidak membuat asumsi tersembunyi.
+
+## Klarifikasi teknis Foundation
+
+Phase 01 hanya draft manual. purpose_type adalah tujuan ROUTINE/KP/KJ/KP_KJ, bukan mekanisme atau hasil. Referensi kebutuhan berikutnya mencatat published batch/version independen dari bulan DUK.

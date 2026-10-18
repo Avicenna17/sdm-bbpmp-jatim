@@ -1,0 +1,1 @@
+<pre class="whitespace-pre-wrap text-sm">{{ json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>

@@ -644,12 +644,12 @@ Test harus mencakup policy/query scope, bukan hanya hidden navigation.
 ### Expected
 
 - [ ] `/admin` tetap dapat diakses sesuai permission lama;
-- [ ] `/pak` ditolak;
-- [ ] resource PAK tidak bocor di Admin Panel.
+- [ ] `/admin/pak` ditolak;
+- [ ] resource PAK tidak tampil pada workspace SDM dan direct URL ditolak tanpa permission PAK.
 
 ## TC-PAK-021 — Admin PAK
 
-- [ ] `/pak` dapat diakses;
+- [ ] `/admin/pak` dapat diakses, `/admin` menuju home PAK jika hanya satu modul;
 - [ ] tidak otomatis memperoleh user.manage jika role tidak memiliki permission tersebut.
 
 ---
@@ -843,3 +843,12 @@ Implementasikan:
 ### UAT
 
 Dilakukan bersama Tim SDM menggunakan berkas nyata yang telah dianonimkan bila diperlukan.
+
+## Klarifikasi teknis Foundation
+
+Uji whitelist DUK published tanpa izin SDM; histori verified tanpa tanggal fiktif; organisasi historis bertanggal; nullable validity DRAFT; pasangan tanggal valid; overlap rule diperbolehkan; purpose_type terpisah dari mekanisme/hasil; retensi akun/audit. Integrasi kebutuhan berikutnya memakai published batch/version Peta Jabatan, bukan bulan DUK.
+
+
+## Corrective Phase 01 — Internal Workspace
+
+Test matrix lengkap dan kontrak keamanan: [internal-workspaces.md](internal-workspaces.md). Automated coverage: tests/Feature/Pak/InternalWorkspaceTest.php dan PanelAuthorizationTest.php. Mencakup permission/role campuran, 0/1/>1 landing, intended URL/record authorization, selector, navigation route/component, dua workspace Livewire, permission revocation, akun inactive, seeder idempotent, serta seluruh /pak/* lama 404. Tidak menambah business rule Phase 02.

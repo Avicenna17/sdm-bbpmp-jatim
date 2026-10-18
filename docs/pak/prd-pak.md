@@ -371,17 +371,22 @@ Jika di kemudian hari diperlukan approval/login pimpinan, ditambahkan pada fase 
 
 ```text
 /                → Public Dashboard SDM
-/admin           → Filament Admin SDM existing
+/admin           → Satu Filament internal panel: workspace SDM + PAK
 ```
 
 ### 8.2 PAK
 
-Direkomendasikan:
+Arsitektur internal yang disetujui (corrective Phase 01):
 
 ```text
-/pak             → Filament Panel PAK / Tim SDM
-/pegawai         → Portal/Panel Pegawai
+/admin/login     → Satu login internal
+/admin/modules   → Pemilih workspace untuk user multi-module
+/admin/pak       → Home workspace PAK di panel admin
+/admin/pak/...   → Resource PAK dengan permission granular
+/pegawai         → Future panel pegawai (belum diimplementasikan)
 ```
+
+SDM tetap memakai URL existing dan gate period.view; PAK memakai pak.access. Akses berdasarkan effective permission, bukan nama role. Tidak menggunakan tenancy. Route lama /pak dan /pak/* menjadi 404. Lihat [kontrak workspace](internal-workspaces.md).
 
 Semua tetap berada dalam:
 
@@ -570,7 +575,7 @@ Dataset awal relatif kecil. Target:
 ### Foundation
 
 - [ ] Existing `/admin` tetap berfungsi.
-- [ ] Panel `/pak` tersedia dan dibatasi permission.
+- [ ] Workspace `/admin/pak` tersedia di satu panel internal dan dibatasi permission.
 - [ ] Akun pegawai dapat dipetakan ke `people`.
 - [ ] Data historis PAK tidak bergantung pada primary key snapshot DUK.
 - [ ] Rule master memiliki masa berlaku/versioning.
@@ -724,3 +729,7 @@ PAK V1 dianggap selesai ketika:
 9. tiga dokumen dapat dicetak;
 10. seluruh golden/critical test lulus;
 11. existing SDM tetap berjalan tanpa regression kritis.
+
+## Klarifikasi teknis Foundation
+
+Peta Jabatan published memakai position_datasets dan import batch/version independen dari periode DUK. Bulan DUK bukan rekonstruksi Peta Jabatan historis. Panel PAK membaca DUK published read-only melalui whitelist dengan pak.employee.view, tanpa hak administrasi/ekspor SDM.

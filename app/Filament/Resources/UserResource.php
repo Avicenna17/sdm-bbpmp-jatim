@@ -2,12 +2,18 @@
 
 namespace App\Filament\Resources;
 
+use App\Domain\Pak\Services\UserPersonLinkService;
+use App\Domain\Users\AccountStatusService;
+use App\Models\Person;
 use App\Models\User;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
@@ -61,7 +67,30 @@ class UserResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([TextColumn::make('name')->label('Nama')->searchable(), TextColumn::make('email')->searchable(), TextColumn::make('roles.name')->badge()->label('Role')])->actions([EditAction::make()]);
+        return $table->columns([TextColumn::make('name')->label('Nama')->searchable(), TextColumn::make('email')->searchable(), TextColumn::make('roles.name')->badge()->label('Role'), IconColumn::make('is_active')->label('Aktif')->boolean()])->actions([
+            EditAction::make(),
+            Action::make('linkPerson')->label('Pemetaan pegawai')
+                ->authorize(fn () => Gate::allows('user.manage') && Auth::user()?->is_active)
+                ->fillForm(fn (User $record) => ['person_id' => $record->person_id])
+                ->form([
+                    Select::make('person_id')->label('Person (kosong untuk melepas)')->searchable()
+                        ->getSearchResultsUsing(function (string $search) {
+                            Gate::authorize('user.manage');
+
+                            return Person::where(fn ($q) => $q->where('canonical_name', 'like', '%'.mb_substr($search, 0, 100).'%')->orWhere('nip', 'like', '%'.mb_substr($search, 0, 100).'%'))->limit(20)->get()->mapWithKeys(fn ($p) => [$p->id => $p->canonical_name.' · '.($p->nip ?? 'Tanpa NIP')])->all();
+                        })->getOptionLabelUsing(function ($value) {
+                            Gate::authorize('user.manage');
+                            $p = Person::find($value);
+
+                            return $p ? $p->canonical_name.' · '.($p->nip ?? 'Tanpa NIP') : null;
+                        }),
+                    Textarea::make('reason')->label('Alasan/verifikasi identitas')->required()->maxLength(2000),
+                ])->action(fn (User $record, array $data) => app(UserPersonLinkService::class)->link(Auth::user(), $record, filled($data['person_id'] ?? null) ? (int) $data['person_id'] : null, $data['reason'])),
+            Action::make('accountStatus')->label(fn (User $record) => $record->is_active ? 'Nonaktifkan' : 'Aktifkan')
+                ->authorize(fn () => Gate::allows('user.manage') && Auth::user()?->is_active)
+                ->form([Textarea::make('reason')->label('Alasan')->required()->maxLength(2000)])
+                ->action(fn (User $record, array $data) => app(AccountStatusService::class)->change(Auth::user(), $record, ! $record->is_active, $data['reason'])),
+        ]);
     }
 
     public static function getPages(): array

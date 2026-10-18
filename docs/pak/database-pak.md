@@ -3,7 +3,7 @@
 
 **Versi:** 1.0  
 **Tanggal:** 17 Oktober 2026  
-**Status:** Proposed / acuan Phase 01-05
+**Status:** Proposed / acuan Phase 01-05; implementasi Phase 01 mengikuti [plan approved](plans/phase-01-foundation.md) dan [catatan foundation](foundation.md). Tabel fase berikutnya di dokumen ini belum diimplementasikan.
 
 ---
 
@@ -15,7 +15,7 @@ Dokumen ini tidak menggantikan prinsip existing:
 
 - `people` = master identity;
 - `personnel_snapshots` = kondisi pegawai per reporting period;
-- `position_requirement_snapshots` = Peta Jabatan per periode;
+- `position_requirement_snapshots` = Peta Jabatan per import batch/version independen dari periode DUK;
 - Laravel migration = schema source of truth;
 - histori import existing tetap dipertahankan.
 
@@ -45,6 +45,8 @@ users
 people
 personnel_snapshots
 reporting_periods
+position_datasets
+import_batches
 position_requirement_snapshots
 position_projection_values
 roles
@@ -134,8 +136,8 @@ Suggested columns:
 | `birth_place` | VARCHAR(150) NULL | |
 | `birth_date` | DATE NULL | |
 | `gender` | CHAR(1) NULL | bila canonical profile diperlukan |
-| `institution_name` | VARCHAR(255) NULL | |
-| `work_unit_name` | VARCHAR(255) NULL | |
+| `institution_name` | VARCHAR(255) NULL | Current/default metadata; bukan sumber historis canonical |
+| `work_unit_name` | VARCHAR(255) NULL | Current/default metadata; bukan sumber historis canonical |
 | `extra_data` | JSON NULL | non-critical attributes |
 | timestamps | | |
 
@@ -329,13 +331,17 @@ Nama/NIP tidak perlu menjadi source identity baru; ambil dari `people`/snapshot.
 | `code` | VARCHAR(100) |
 | `name` | VARCHAR(255) |
 | `version` | VARCHAR(50) |
-| `valid_from` | DATE |
+| `first_used_at` | TIMESTAMP NULL; marker permanen penggunaan pertama pada case |
+| `valid_from` | DATE NULL (DRAFT) |
 | `valid_until` | DATE NULL |
 | `reference` | TEXT NULL |
 | `status` | VARCHAR(20) |
 | timestamps | |
 
 ---
+
+
+Phase 01: kedua tanggal boleh null; bila keduanya terisi valid_until >= valid_from. Tidak ada resolver, aktivasi, atau larangan overlap versi.
 
 # 14. Predikat Rule
 
@@ -451,12 +457,12 @@ CARRY_PREVIOUS_JF_AK
 | `case_number` | VARCHAR(100) NULL |
 | `person_id` | BIGINT |
 | `source_type` | VARCHAR(30) |
-| `case_type` | VARCHAR(50) |
+| `purpose_type` | VARCHAR(50) |
 | `appointment_type` | VARCHAR(50) NULL |
 | `period_start` | DATE |
 | `period_end` | DATE |
 | `status` | VARCHAR(50) |
-| `pak_rule_set_id` | BIGINT |
+| `pak_rule_set_id` | BIGINT NULL (draft Phase 01) |
 | `source_submission_id` | BIGINT NULL |
 | `created_by` | BIGINT |
 | `finalized_by` | BIGINT NULL |
@@ -472,18 +478,9 @@ SYSTEM_WARNING
 ADMIN_MANUAL
 ```
 
-Suggested `case_type`:
-
-```text
-ROUTINE
-KP
-KJ
-KP_KJ
-APPOINTMENT
-TRANSFER
-ADJUSTMENT
-PROMOTION
-```
+Phase 01 purpose_type (tujuan pemeriksaan, bukan mekanisme atau hasil eligibility):
+ROUTINE, KP, KJ, KP_KJ.
+Rule FK nullable untuk draft incomplete. Status/type memakai VARCHAR + validasi aplikasi, bukan database ENUM/CHECK daftar nilai.
 
 ---
 
@@ -919,10 +916,10 @@ Jangan FK langsung ke satu snapshot sebagai satu-satunya sumber keputusan final 
 Saat eligibility KJ menggunakan Peta Jabatan:
 
 - baca data `published`;
-- catat period/source yang digunakan;
+- catat published batch ID, position_version, published_at, dan nilai sumber yang digunakan;
 - simpan relevant values ke `pak_eligibility_checks.metadata` atau determination snapshot.
 
-Karena Peta Jabatan periode berikutnya dapat berubah.
+Versi Peta Jabatan berikutnya dapat berubah. Pointer published pada position_datasets independen dari reporting_periods; bulan DUK bukan rekonstruksi historis Peta Jabatan.
 
 ---
 
@@ -1064,3 +1061,7 @@ Current state boleh di-cache bila diperlukan, tetapi canonical source tetap hist
 5. Apakah pimpinan akan memiliki user/account di fase berikutnya.
 
 Tidak boleh menghalangi Phase 01 kecuali berdampak pada schema yang irreversible.
+
+## Implementasi Foundation
+
+Schema Phase 01 mengikuti plans/phase-01-foundation.md: kategori JF dinormalisasi; histori verified wajib TMT nyata dan hanya jabatan utama; organisasi profil current/default bukan sumber historis; akun memakai is_active dan actor RESTRICT; audit mendukung subjek selain case. Tabel fase berikutnya belum diimplementasikan.

@@ -111,3 +111,13 @@ Pengelolaan versi, editor kolom, preview, uji contoh file, serta pemetaan import
 Untuk `php artisan serve`, gunakan `APP_URL=http://127.0.0.1:8000` dan biarkan `ASSET_URL=` kosong di `.env`. Dengan demikian, CSS dan JavaScript Vite dilayani dari host lokal yang sedang dibuka. Jangan menyalin `ASSET_URL` produksi ke konfigurasi lokal: JavaScript bertipe module lintas domain dapat ditolak browser, meskipun CSS dan angka ringkasan masih tampil.
 
 Setelah mengubah konfigurasi, jalankan `php artisan config:clear`, lalu `pnpm run build`. Pastikan URL script pada dashboard mengarah ke `/build/assets/` di host lokal. Di server produksi subdirektori, tetap gunakan konfigurasi server yang sesuai, misalnya `APP_URL=https://lpmp-jatim.net/sdm` dan `ASSET_URL=https://lpmp-jatim.net/sdm`, serta unggah hasil build yang dibuat dengan konfigurasi produksi tersebut. Jangan mengunggah `.env` lokal ke server.
+
+## PAK Foundation — Phase 01
+
+Satu panel internal /admin dengan login /admin/login menyediakan workspace SDM dan PAK berdasarkan permission. Lihat [arsitektur workspace](docs/pak/internal-workspaces.md). Route lama /pak/* dipensiunkan (404). Baca [panduan foundation](docs/pak/foundation.md), [baseline](docs/pak/baseline-phase-01.md), dan [laporan implementasi](docs/pak/implementation-phase-01.md) sebelum penerapan. Implementasi belum mencakup perhitungan/konversi, workflow kenaikan, portal pegawai, atau dokumen.
+
+Pada lingkungan staging terisolasi setelah backup: jalankan migration additive dengan "php artisan migrate", lalu "php artisan db:seed". Seeder membuat permission, role Admin PAK/Pegawai, dan taxonomy foundation; tidak memberikan role PAK kepada akun existing. Berikan role Admin PAK secara eksplisit melalui pengelolaan User menggunakan administrator berizin user.manage. Super Admin tidak otomatis mendapat PAK. Seeder ulang mempertahankan izin PAK yang telah diberikan/dicabut dan status akun nonaktif.
+
+Pemetaan User–Person dan deactivate/reactivate tersedia sebagai action khusus pada User di /admin, wajib alasan dan diaudit. Akun actor histori/audit tidak dihapus; nonaktifkan untuk mempertahankan FK dan bukti audit.
+
+Verifikasi terisolasi: "php vendor/bin/phpunit tests/Feature/Pak --do-not-cache-result", lalu "php vendor/bin/phpunit --do-not-cache-result". Konfigurasi PHPUnit menggunakan SQLite in-memory; pengujian MySQL concurrency dan UAT tetap diperlukan sebelum penerapan.

@@ -758,3 +758,7 @@ Aksi penting menyimpan:
 | BR-BAL-003 | Saldo/jenjang baru efektif pada SK atau TMT? |
 
 Pending rules tidak boleh diperlakukan Codex sebagai fakta final.
+
+## Klarifikasi teknis Foundation
+
+Klarifikasi teknis BR-KJ-006 tanpa perubahan status: sumber published Peta Jabatan adalah published_batch_id pada position_datasets, dengan position_version/published_at pada import_batches. Integrasi berikutnya menyimpan versi/nilai sumber. Business rule PENDING tetap.
