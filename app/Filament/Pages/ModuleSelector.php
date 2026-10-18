@@ -9,7 +9,14 @@ class ModuleSelector extends Page
 {
     protected static ?string $slug = 'modules';
 
-    protected static ?string $title = 'Pilih Modul';
+    protected static ?string $title = 'Modul Aplikasi';
+
+    protected static string $layout = 'filament-panels::components.layout.simple';
+
+    protected function getLayoutData(): array
+    {
+        return ['maxWidth' => '6xl', 'hasTopbar' => false];
+    }
 
     protected static bool $shouldRegisterNavigation = false;
 
@@ -33,7 +40,13 @@ class ModuleSelector extends Page
         $access = app(InternalModuleAccess::class);
         $modules = [];
         foreach ($access->accessible(auth()->user()) as $id => $definition) {
-            $modules[] = ['id' => $id, 'label' => $definition['label'], 'url' => $access->home($id)];
+            $modules[] = [
+                'id' => $id,
+                'label' => $id === 'sdm' ? 'Manajemen SDM' : 'PAK Konversi',
+                'icon' => $id === 'sdm' ? 'heroicon-o-users' : 'heroicon-o-document-text',
+                'description' => $id === 'sdm' ? 'Data pegawai, riwayat, DUK, dan peta jabatan.' : 'Konversi kinerja, akumulasi AK, dan penetapan PAK.',
+                'url' => $access->home($id),
+            ];
         }
 
         return ['modules' => $modules];

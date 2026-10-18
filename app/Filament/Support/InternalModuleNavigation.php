@@ -32,7 +32,7 @@ final class InternalModuleNavigation
         $modules = $access->accessible(auth()->user());
         $module = $this->currentModule();
         if (count($modules) > 1) {
-            $builder->item(NavigationItem::make('Ganti Modul')->icon('heroicon-o-squares-2x2')->url(ModuleSelector::getUrl(panel: 'admin')));
+            $builder->item(NavigationItem::make('Modul Aplikasi')->icon('heroicon-o-squares-2x2')->url(ModuleSelector::getUrl(panel: 'admin')));
         }
         if (! $module || ! isset($modules[$module])) {
             return $builder;
@@ -47,7 +47,10 @@ final class InternalModuleNavigation
                 $groups[$item->getGroup() ?? ''][] = $item;
             }
         }
-        foreach (array_unique(['', ...$definition['groups'], ...array_keys($groups)]) as $group) {
+        $groupOrder = $module === 'pak'
+            ? ['DATA KEPEGAWAIAN', 'REFERENSI PAK', 'PENGELOLAAN PAK', 'AUDIT & AKTIVITAS']
+            : $definition['groups'];
+        foreach (array_unique(['', ...$groupOrder, ...array_keys($groups)]) as $group) {
             $items = $groups[$group] ?? [];
             usort($items, fn ($a, $b) => $a->getSort() <=> $b->getSort());
             if ($group === '') {

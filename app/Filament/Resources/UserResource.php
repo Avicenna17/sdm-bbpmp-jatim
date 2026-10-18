@@ -67,7 +67,9 @@ class UserResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([TextColumn::make('name')->label('Nama')->searchable(), TextColumn::make('email')->searchable(), TextColumn::make('roles.name')->badge()->label('Role'), IconColumn::make('is_active')->label('Aktif')->boolean()])->actions([
+        return $table->columns([TextColumn::make('name')->label('Nama')->searchable(), TextColumn::make('email')->searchable(), TextColumn::make('roles.name')->badge()->label('Role')->color(fn (string $state): string => match ($state) {
+            'Super Admin' => 'primary', 'Admin SDM' => 'info', 'Admin PAK' => 'success', 'Internal Viewer' => 'warning', default => 'gray',
+        }), IconColumn::make('is_active')->label('Aktif')->boolean()])->actions([
             EditAction::make(),
             Action::make('linkPerson')->label('Pemetaan pegawai')
                 ->authorize(fn () => Gate::allows('user.manage') && Auth::user()?->is_active)
@@ -87,6 +89,7 @@ class UserResource extends Resource
                     Textarea::make('reason')->label('Alasan/verifikasi identitas')->required()->maxLength(2000),
                 ])->action(fn (User $record, array $data) => app(UserPersonLinkService::class)->link(Auth::user(), $record, filled($data['person_id'] ?? null) ? (int) $data['person_id'] : null, $data['reason'])),
             Action::make('accountStatus')->label(fn (User $record) => $record->is_active ? 'Nonaktifkan' : 'Aktifkan')
+                ->color(fn (User $record) => $record->is_active ? 'danger' : 'success')
                 ->authorize(fn () => Gate::allows('user.manage') && Auth::user()?->is_active)
                 ->form([Textarea::make('reason')->label('Alasan')->required()->maxLength(2000)])
                 ->action(fn (User $record, array $data) => app(AccountStatusService::class)->change(Auth::user(), $record, ! $record->is_active, $data['reason'])),

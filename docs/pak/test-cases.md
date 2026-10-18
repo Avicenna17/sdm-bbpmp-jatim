@@ -852,3 +852,20 @@ Uji whitelist DUK published tanpa izin SDM; histori verified tanpa tanggal fikti
 ## Corrective Phase 01 — Internal Workspace
 
 Test matrix lengkap dan kontrak keamanan: [internal-workspaces.md](internal-workspaces.md). Automated coverage: tests/Feature/Pak/InternalWorkspaceTest.php dan PanelAuthorizationTest.php. Mencakup permission/role campuran, 0/1/>1 landing, intended URL/record authorization, selector, navigation route/component, dua workspace Livewire, permission revocation, akun inactive, seeder idempotent, serta seluruh /pak/* lama 404. Tidak menambah business rule Phase 02.
+
+
+## UX Polish Phase 01 — acceptance regression
+
+Coverage: tests/Feature/Pak/PresentationPolishTest.php dan InternalWorkspaceTest.php.
+
+- Selector Modul Aplikasi: label Manajemen SDM/PAK Konversi, CTA Buka Modul, icon, satu tautan per card, menu akun, tanpa sidebar; permission dan landing tetap.
+- Navigasi sesuai kelompok/urutan final, satu home link, akses single/multi-module tetap.
+- Data Pegawai menghitung query daftar existing termasuk Person tanpa profil verified; keterangan ringkas: Data pada daftar PAK; bukan ukuran verifikasi atau kelengkapan.
+- Count berizin kosong = 0; tanpa izin = — dan tidak mengeksekusi count. Perlu Pemeriksaan dan PAK Ditetapkan selalu placeholder Phase 01.
+- Aktivitas: search actor/kode/objek, filter jenis/tanggal dan kombinasi, rentang satu sisi, invalid range, empty result, akhir hari inclusive, timezone konfigurasi termasuk selain Asia/Jakarta.
+- Detail escaped dan read-only, kode tidak dikenal fallback, tidak menulis event saat melihat/filter.
+- Badge semantic color per role/multi-role; status action danger/success, alasan wajib serta audit deactivate/reactivate tetap.
+- Seluruh regression Phase 01/SDM tetap dijalankan; tidak mengimplementasikan test bisnis fase berikutnya sebagai fitur baru.
+
+
+Revisi referensi portal: test selector memeriksa identitas/selamat datang/deskripsi/footer baru; dashboard memeriksa subjudul dan catatan draf. ActivityDetailPresentationTest memeriksa deactivate/reactivate berdasarkan payload, alasan/narasi, nilai missing/null, payload bertingkat, fallback event tidak dikenal, escaping, dan raw JSON hanya dalam disclosure tertutup. Rendering detail tidak mengubah payload/event.

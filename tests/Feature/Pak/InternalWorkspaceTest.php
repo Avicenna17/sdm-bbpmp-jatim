@@ -41,12 +41,12 @@ class InternalWorkspaceTest extends PakTestCase
             $this->loginRole($role);
             $this->get('/admin')->assertRedirect(ManageData::getUrl(panel: 'admin'));
             $this->get('/admin/modules')->assertRedirect(ManageData::getUrl(panel: 'admin'));
-            $this->get('/admin/manage-data')->assertOk()->assertDontSee('Ganti Modul')->assertDontSee('Data Pegawai PAK');
+            $this->get('/admin/manage-data')->assertOk()->assertDontSee('Modul Aplikasi')->assertDontSee('Data Pegawai');
             $this->get('/admin/pak')->assertForbidden();
         }
         $this->actingAs($this->manager);
         $this->get('/admin')->assertRedirect(Dashboard::getUrl(panel: 'admin'));
-        $this->get('/admin/pak')->assertOk()->assertSee('Data Pegawai PAK')->assertDontSee('Ganti Modul')->assertDontSee('Peta Jabatan / Kebutuhan');
+        $this->get('/admin/pak')->assertOk()->assertSee('Data Pegawai')->assertDontSee('Modul Aplikasi')->assertDontSee('Peta Jabatan / Kebutuhan');
         foreach (['manage-data', 'personnel-data', 'position-data', 'import-history', 'export-data', 'templates', 'users', 'roles'] as $slug) {
             $this->get('/admin/'.$slug)->assertForbidden();
         }
@@ -61,9 +61,9 @@ class InternalWorkspaceTest extends PakTestCase
     {
         $user = $this->loginRole('Super Admin');
         $this->get('/admin')->assertRedirect(ModuleSelector::getUrl(panel: 'admin'));
-        $this->get('/admin/modules')->assertOk()->assertSee('Buka SDM')->assertSee('Buka PAK Konversi');
-        $this->get('/admin/manage-data')->assertOk()->assertSee('Ganti Modul')->assertDontSee('Data Pegawai PAK');
-        $this->get('/admin/pak')->assertOk()->assertSee('Ganti Modul')->assertDontSee('Periode dan Import Data');
+        $this->get('/admin/modules')->assertOk()->assertSee('Manajemen SDM')->assertSee('PAK Konversi')->assertSee('Buka Modul');
+        $this->get('/admin/manage-data')->assertOk()->assertSee('Modul Aplikasi')->assertDontSee('Data Pegawai');
+        $this->get('/admin/pak')->assertOk()->assertSee('Modul Aplikasi')->assertDontSee('Periode dan Import Data');
         Livewire::test(ManageData::class)->set('month', '2027-01')->call('createPeriod')->assertHasNoErrors();
         Livewire::test(ManageFunctionalPosition::class)->callAction('create', ['code' => 'WORKSPACE', 'name' => 'JF Sintetis', 'is_active' => true])->assertHasNoActionErrors();
         $this->assertSame('2027-01-01', ReportingPeriod::latest('id')->first()->period_month->format('Y-m-d'));
@@ -84,7 +84,7 @@ class InternalWorkspaceTest extends PakTestCase
             $homeItems = $items->filter(fn ($item) => $item->getUrl() === $home);
             $this->assertCount(1, $homeItems);
             $this->assertSame($label, $homeItems->first()->getLabel());
-            $this->assertCount(1, $items->filter(fn ($item) => $item->getLabel() === 'Ganti Modul'));
+            $this->assertCount(1, $items->filter(fn ($item) => $item->getLabel() === 'Modul Aplikasi'));
         }
     }
 
@@ -93,12 +93,12 @@ class InternalWorkspaceTest extends PakTestCase
         $user = User::factory()->create()->givePermissionTo('pak.access');
         $this->actingAs($user);
         $this->get('/admin')->assertRedirect(Dashboard::getUrl(panel: 'admin'));
-        $this->get('/admin/pak')->assertOk()->assertDontSee('Data Pegawai PAK');
+        $this->get('/admin/pak')->assertOk()->assertSee('Tidak memiliki akses');
         $this->get('/admin/pak/employees')->assertForbidden();
         $user->givePermissionTo('personnel.view');
         $this->get('/admin/personnel-data')->assertForbidden();
         $user->givePermissionTo('period.view');
-        $this->get('/admin/modules')->assertOk()->assertSee('Buka SDM')->assertSee('Buka PAK Konversi');
+        $this->get('/admin/modules')->assertOk()->assertSee('Manajemen SDM')->assertSee('PAK Konversi')->assertSee('Buka Modul');
         $this->get('/admin/personnel-data')->assertOk();
     }
 

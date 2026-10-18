@@ -13,7 +13,11 @@ class FunctionalCategoryResource extends MasterResource
 
     protected static ?string $navigationLabel = 'Kategori JF';
 
+    protected static ?int $navigationSort = 1;
+
     protected static ?string $modelLabel = 'Kategori JF';
+
+    protected static ?string $pluralModelLabel = 'Kategori JF';
 
     public static string $masterType = 'category';
 

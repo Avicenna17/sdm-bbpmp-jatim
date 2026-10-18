@@ -7,5 +7,11 @@ use Filament\Resources\Pages\ListRecords;
 
 class ListEvents extends ListRecords
 {
+    public function applyTableFilters(): void
+    {
+        $this->getTableFiltersForm()->getState();
+        parent::applyTableFilters();
+    }
+
     protected static string $resource = PakEventResource::class;
 }

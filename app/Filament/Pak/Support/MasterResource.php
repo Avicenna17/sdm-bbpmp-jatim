@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 
 abstract class MasterResource extends Resource
 {
-    protected static ?string $navigationGroup = 'Master PAK';
+    protected static ?string $navigationGroup = 'REFERENSI PAK';
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 

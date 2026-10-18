@@ -13,7 +13,11 @@ class FunctionalPositionResource extends MasterResource
 
     protected static ?string $navigationLabel = 'Jabatan Fungsional';
 
+    protected static ?int $navigationSort = 3;
+
     protected static ?string $modelLabel = 'Jabatan Fungsional';
+
+    protected static ?string $pluralModelLabel = 'Jabatan Fungsional';
 
     public static string $masterType = 'position';
 

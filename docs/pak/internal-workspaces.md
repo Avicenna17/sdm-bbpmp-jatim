@@ -43,7 +43,7 @@ Login response consumes intended URL once. It accepts only same-origin registere
 
 ## Workspace navigation and Livewire
 
-A custom Filament NavigationBuilder preserves existing groups inside the current workspace. Module cards and Ganti Modul appear only for authorized modules; Ganti Modul requires more than one. The selector does not show a combined domain sidebar.
+A custom Filament NavigationBuilder preserves existing groups inside the current workspace. Module cards and Modul Aplikasi appear only for authorized modules; Modul Aplikasi requires more than one. The selector does not show a combined domain sidebar.
 
 Supported Livewire `current()` supplies the verified rendering component instance, mapped exactly against the registry. Normal HTTP can resolve the registered route after the component stack is popped during layout rendering. Livewire requests with unknown component context receive no domain navigation; there is no global snapshot parsing, Referer or mutable active-module session. Two tabs therefore do not overwrite each other's workspace.
 
@@ -55,15 +55,37 @@ Persistent `EnsureInternalModuleAccess` checks the original registered route thr
 
 ## Verification and manual UAT
 
-Automated tests cover role matrix, direct/mixed permissions, 0/1/>1 landing, login intended routes and record authorization, granular direct URL denial, selector/navigation visibility, Ganti Modul, component context across two workspaces, real HTTP Livewire refresh after another workspace request, permission revocation, old route 404, unknown internal route rejection, explicit/idempotent seeder and unchanged account metadata. Existing PAK and SDM suites remain required.
+Automated tests cover role matrix, direct/mixed permissions, 0/1/>1 landing, login intended routes and record authorization, granular direct URL denial, selector/navigation visibility, Modul Aplikasi, component context across two workspaces, real HTTP Livewire refresh after another workspace request, permission revocation, old route 404, unknown internal route rejection, explicit/idempotent seeder and unchanged account metadata. Existing PAK and SDM suites remain required.
 
 Manual UAT before release:
 - Review/approve the working-tree change; no final commit is made automatically.
 - In staging, explicitly apply the permission seeder through the normal operational process; verify existing users/role customizations and mapping are preserved. No schema change is needed.
 - Log in with SDM-only, PAK-only, Super Admin, Pegawai-only, mixed role and inactive accounts. Check intended deep links and logout/login.
-- Open SDM and PAK in two browser tabs, switch using Ganti Modul and verify no re-login, sidebar isolation, responsive cards/sidebar and normal back/bookmark behavior.
+- Open SDM and PAK in two browser tabs, switch using Modul Aplikasi and verify no re-login, sidebar isolation, responsive cards/sidebar and normal back/bookmark behavior.
 - Exercise a Livewire modal/table/action in each workspace; revoke permissions or deactivate from another session and confirm access is denied on subsequent requests.
 - Check public dashboard, import, publish, export, templates and independent Peta Jabatan publications with representative staging data.
 - Confirm old /pak routes return 404 and existing SDM bookmarks still work. Confirm production route/config caches are refreshed through the normal release process after approval.
 
 No business PENDING decision is resolved. BR-SKP-008, BR-PERIOD-003, BR-APPOINT-008, BR-KJ-005 and BR-BAL-003 remain pending, along with simultaneous/Plt/Plh position requirements. No calculation, warning, portal or document generator is introduced.
+
+
+## Phase 01 UX polish
+
+Selector memakai layout sederhana khusus halaman, tanpa sidebar, dengan menu akun. Card Manajemen SDM dan PAK Konversi hanya muncul sesuai akses, seluruh card merupakan satu tautan dengan CTA Buka Modul. Resolver, landing, URL dan permission tidak berubah.
+
+Navigasi PAK: Beranda PAK; DATA KEPEGAWAIAN (Data Pegawai); REFERENSI PAK (Kategori JF, Jenjang JF, Jabatan Fungsional, Pemetaan Jabatan dan Jenjang, Aturan PAK); PENGELOLAAN PAK (Draf PAK); AUDIT & AKTIVITAS (Riwayat Aktivitas). Modul Aplikasi tetap khusus multi-module. Aturan PAK hanya metadata rule-set Phase 01.
+
+Beranda PAK Konversi menampilkan Data Pegawai (count query daftar existing), Draf PAK (count DRAFT), dan placeholder Perlu Pemeriksaan/PAK Ditetapkan. Keterangan Data Pegawai: **Data pada daftar PAK; bukan ukuran verifikasi atau kelengkapan.** Query count hanya dijalankan setelah izin terkait terpenuhi; tanpa izin ditampilkan — / Tidak memiliki akses. Placeholder bukan nol atau hasil eligibility.
+
+Riwayat Aktivitas menggunakan pak_events existing, read-only. Search mencakup actor, kode aktivitas, jenis dan ID objek, bukan payload. Filter jenis dan tanggal aktivitas memakai config('app.timezone'); WIB hanya untuk Asia/Jakarta. Akhir hari inclusive melalui batas eksklusif awal hari berikutnya. Timestamp existing ditulis Eloquent pada timezone aplikasi; polish tidak mengubah format penyimpanan atau timezone konfigurasi. Detail menampilkan metadata dan payload yang di-escape. Tidak ada event/domain workflow baru.
+
+Badge role memakai semantic color existing: Super Admin primary, Admin SDM info, Admin PAK success, Internal Viewer warning, Pegawai/default gray. Nonaktifkan danger; Aktifkan success. Modal alasan/service/authorization/audit tidak berubah.
+
+
+### Revisi tampilan mengikuti referensi portal
+
+Halaman Modul Aplikasi menampilkan identitas BBPMP Jawa Timur / Portal Kepegawaian, Selamat Datang, dua card modul berizin, CTA Buka Modul ↗ dan footer institusi. Deskripsi PAK menyebut cakupan modul; revisi ini tidak menyediakan konversi, akumulasi atau penetapan baru.
+
+Beranda menampilkan subjudul pengelolaan dan ringkasan 2×2. Keterangan Data Pegawai dipersingkat menjadi “Data pada daftar PAK; bukan ukuran verifikasi atau kelengkapan.” Definisi count, izin, dan placeholder tetap sama.
+
+Detail Riwayat Aktivitas kini memakai ActivityDetailPresenter (presentation-only): metadata human-readable, perubahan sebelum/sesudah, alasan dan narasi. Status akun memakai Aktif/Tidak Aktif berdasarkan payload existing. Nilai yang tidak direkam ditandai Tidak tercatat; null ditampilkan —. Data teknis JSON hanya di disclosure Lihat data teknis yang tertutup secara default; seluruh teks tetap escaped. Formatter tidak mengubah/menulis event atau mengambil nilai historis dari status akun terkini.

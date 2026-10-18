@@ -22,11 +22,15 @@ class PakRuleSetResource extends Resource
 
     protected static ?string $model = PakRuleSet::class;
 
-    protected static ?string $navigationGroup = 'Master PAK';
+    protected static ?string $navigationGroup = 'REFERENSI PAK';
 
-    protected static ?string $navigationLabel = 'Metadata Rule Set';
+    protected static ?string $navigationLabel = 'Aturan PAK';
 
-    protected static ?string $modelLabel = 'Metadata Rule Set';
+    protected static ?int $navigationSort = 5;
+
+    protected static ?string $modelLabel = 'Aturan PAK';
+
+    protected static ?string $pluralModelLabel = 'Aturan PAK';
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
 
@@ -45,7 +49,7 @@ class PakRuleSetResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([TextColumn::make('code')->searchable(), TextColumn::make('name')->label('Nama'), TextColumn::make('version')->label('Versi'), TextColumn::make('valid_from')->date(), TextColumn::make('valid_until')->date(), TextColumn::make('status')->badge()])
+        return $table->description('Metadata versi aturan Phase 01; bukan aturan aktif atau engine perhitungan.')->columns([TextColumn::make('code')->searchable(), TextColumn::make('name')->label('Nama'), TextColumn::make('version')->label('Versi'), TextColumn::make('valid_from')->date(), TextColumn::make('valid_until')->date(), TextColumn::make('status')->badge()])
             ->actions([
                 EditAction::make()->using(fn (PakRuleSet $record, array $data) => app(PakRuleSetService::class)->save(auth()->user(), $data, $record->id)),
                 Action::make('copy')->label('Salin versi')->authorize(fn () => Access::allows(auth()->user(), 'pak.rule-set.manage'))

@@ -30,11 +30,15 @@ class PakCaseResource extends Resource
 
     protected static ?string $model = PakCase::class;
 
-    protected static ?string $navigationLabel = 'Draft PAK';
+    protected static ?string $navigationLabel = 'Draf PAK';
 
-    protected static ?string $modelLabel = 'Draft PAK';
+    protected static ?int $navigationSort = 1;
 
-    protected static ?string $navigationGroup = 'Draft PAK';
+    protected static ?string $modelLabel = 'Draf PAK';
+
+    protected static ?string $pluralModelLabel = 'Draf PAK';
+
+    protected static ?string $navigationGroup = 'PENGELOLAAN PAK';
 
     protected static ?string $navigationIcon = 'heroicon-o-folder';
 

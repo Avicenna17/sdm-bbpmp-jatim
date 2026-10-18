@@ -27,11 +27,15 @@ class EmployeeResource extends Resource
 
     protected static ?string $model = Person::class;
 
-    protected static ?string $navigationLabel = 'Data Pegawai PAK';
+    protected static ?string $navigationLabel = 'Data Pegawai';
 
-    protected static ?string $modelLabel = 'Pegawai PAK';
+    protected static ?int $navigationSort = 1;
 
-    protected static ?string $navigationGroup = 'Pegawai';
+    protected static ?string $modelLabel = 'Data Pegawai';
+
+    protected static ?string $pluralModelLabel = 'Data Pegawai';
+
+    protected static ?string $navigationGroup = 'DATA KEPEGAWAIAN';
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
 

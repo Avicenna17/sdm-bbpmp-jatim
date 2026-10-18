@@ -13,7 +13,11 @@ class FunctionalLevelResource extends MasterResource
 
     protected static ?string $navigationLabel = 'Jenjang JF';
 
+    protected static ?int $navigationSort = 2;
+
     protected static ?string $modelLabel = 'Jenjang JF';
+
+    protected static ?string $pluralModelLabel = 'Jenjang JF';
 
     public static string $masterType = 'level';
 
