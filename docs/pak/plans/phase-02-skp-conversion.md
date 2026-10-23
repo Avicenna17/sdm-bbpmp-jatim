@@ -4,6 +4,10 @@
 
 ## 1. Baseline, tujuan, dan boundary
 
+### Pembaruan keputusan client — 23 Oktober 2026
+
+Checkpoint dokumentasi ini menyinkronkan BR-SKP-002/004/005/006/009/010, BR-JAB-001, BR-REGIME-001, BR-DATA-001, BR-REF-001, dan BR-KONV-004 pada `../business-rules.md`. Keputusan client menggantikan ketentuan lama yang bertentangan tentang pemilihan sumber, jenjang, TMT tengah bulan, dan rounding. Arsitektur, chain revisi, tabel, permission, checkpoint, satu rule set eksplisit, dan batas Phase 02 lainnya tetap. Tidak ada implementasi/source yang dibuat.
+
 ### Baseline yang diterima
 
 Baseline Phase 01 pada commit **252661a** telah berhasil diuji di environment lokal:
@@ -18,8 +22,8 @@ Seluruh checkpoint Phase 02 menggunakan branch `feature/pak-phase-02`.
 
 Tim SDM dapat:
 
-- Mencatat SKP official dan provisional beserta bukti dan revisinya.
-- Memilih sumber dan satu rule set secara eksplisit.
+- Mencatat SKP resmi triwulan/Evaluasi Akhir beserta bukti dan revisinya; tidak membuat provisional source terpisah.
+- Meninjau sumber yang di-resolve sesuai prioritas bisnis client dan memilih satu rule set secara eksplisit.
 - Menghasilkan segment konversi yang tidak overlap.
 - Menghitung AK Konversi secara eksak di server.
 - Menyimpan preview, provenance, calculation trace, dan issue review.
@@ -57,10 +61,10 @@ Pisahkan tiga konsep:
 | Konsep | Nilai |
 |---|---|
 | Jenis evaluasi | `Q1`, `Q2`, `Q3`, `Q4`, `ANNUAL`, `CUSTOM_PERIOD` |
-| Sifat sumber | `OFFICIAL`, `PROVISIONAL` |
+| Sifat sumber | `OFFICIAL`; `PROVISIONAL` hanya konsep historis desain, bukan sumber baru Phase 02 |
 | Status revisi sumber | `CURRENT`, `SUPERSEDED` |
 
-`CUSTOM_PERIOD` digunakan untuk provisional dengan rentang khusus; bukan jenis SKP resmi baru.
+`CUSTOM_PERIOD` merupakan konsep historis desain provisional, bukan jenis SKP resmi atau jalur input provisional baru Phase 02. Struktur arsitektur dan retensi bukti historis tidak dihapus.
 
 Simpan person, coverage sumber, predikat asli, referensi bukti, actor/time, alasan provisional, dan hubungan revisi. Coverage sumber tidak ditimpa oleh requested conversion range.
 
@@ -68,17 +72,21 @@ Kontrak provenance:
 
 - **OFFICIAL wajib memiliki source/reference identifier yang tidak kosong.**
 - Evidence file boleh menyusul apabila workflow bisnis mengizinkan; ketiadaan file tidak membolehkan official reference kosong.
-- **PROVISIONAL wajib memiliki reason, actor, timestamp**, serta permission `pak.skp.provisional` selain `pak.skp.manage`.
+- Metadata provisional historis tetap memuat reason, actor, timestamp; permission `pak.skp.provisional` dipertahankan dalam baseline tanpa mengaktifkan input provisional baru.
 - Actor dan timestamp berasal dari server.
 - Penambahan evidence setelah evaluasi digunakan run mengikuti mekanisme revisi, bukan perubahan versi lama.
+
+Fallback SKP sudah RESOLVED: annual jika tersedia (termasuk subset), selain itu triwulan terakhir relevan; Jan–Okt memakai Q3. Tidak ada provisional source terpisah. Jika sumber relevan belum tersedia, review tanpa membuat predikat sendiri. Permission/konsep historis bukan izin membuka alur provisional baru.
+
+BR-SKP-008 tetap PENDING BUSINESS DECISION hanya untuk kebijakan refresh/revision ketika calculation/draft berbasis triwulan sudah tersimpan lalu annual tersedia. Tidak ada auto-update calculation lama, penggantian sumber snapshot, atau successor otomatis. Bukti sumber saat calculation tetap dicatat; mekanisme teknis revision chain tidak menetapkan kebijakan bisnis tersebut.
 
 Contoh annual untuk subset:
 
 - Jenis sumber tetap `ANNUAL`.
 - Coverage asli tetap Januari–Desember 2023.
 - Requested range November–Desember 2023 disimpan terpisah.
-- Penggunaannya menghasilkan `ANNUAL_SUBSET_REQUIRES_REVIEW`.
-- Preview diperbolehkan; tidak dianggap sebagai pengesahan aturan annual untuk subset.
+- Evaluasi Akhir menjadi sumber utama, termasuk untuk subset tahun, sesuai BR-SKP-002 yang telah dikonfirmasi client.
+- Tidak menghasilkan `ANNUAL_SUBSET_REQUIRES_REVIEW` hanya karena rentang konversi merupakan subset coverage annual.
 
 ### Correction chain PerformanceEvaluation
 
@@ -99,18 +107,20 @@ Immutability:
 - File lama tidak ditimpa, diganti, atau dihapus; revisi evidence menggunakan objek private baru.
 - Metadata supersession hanya berubah melalui service terotorisasi dan diaudit.
 - Official tidak otomatis menghapus provisional atau mengubah hasil lama.
-- Penggantian penuh boleh menandai provisional `SUPERSEDED`.
+- Supersession sumber historis mengikuti correction chain; kedatangan annual tidak otomatis menandai run triwulan lama superseded (BR-SKP-008).
 
 **Partial replacement coverage bukan correction chain.** Sumber pengganti sebagian tetap boleh coexist dengan sumber lama, tidak mengisi `previous_version_id` sebagai hubungan koreksi sebagian, dan tidak menandai seluruh coverage lama telah tergantikan. Hubungan penggunaan sumber parsial ditelusuri melalui segment dan audit yang relevan.
 
 ### Pemilihan sumber dan periode
 
-- Operator memilih sumber secara eksplisit; tidak berdasarkan record terbaru.
-- Evaluasi Akhir resmi untuk tahun penuh mengikuti `BR-SKP-002`.
+- Server memilih sumber sesuai prioritas bisnis; operator meninjau provenance dan tidak boleh mengabaikan sumber utama dengan memilih predikat lain.
+- Evaluasi Akhir resmi mengalahkan triwulan untuk tahun terkait, termasuk subset bulan (`BR-SKP-002`).
+- Jika Evaluasi Akhir belum tersedia, gunakan triwulan terakhir relevan (`BR-SKP-009`): Januari–Oktober menggunakan Q3 ketika Q4/Evaluasi Akhir belum tersedia, tanpa provisional Oktober.
+- Jika beberapa record annual berbeda karena perubahan jabatan, pilih record terkait jabatan dengan TMT terbesar yang berlaku pada bulan tersebut (`BR-SKP-010`); bila perubahan berulang dalam bulan sama gunakan TMT paling akhir. Bukan urutan record/ID/import/Excel. Hubungan tidak terbukti/ambigu harus direview.
 - Annual dan triwulan dapat coexist sebagai sumber, tetapi bulan yang sama hanya dipilih sekali dalam run.
-- Provisional memerlukan alasan, actor, waktu, dan permission tambahan.
-- Sumber harus milik person case dan mencakup segment yang dihitung.
-- Gap tidak diisi dengan nilai nol atau predikat sebelumnya.
+- Tidak menggunakan provisional source terpisah pada fallback Phase 02.
+- Sumber harus milik person case; coverage asli dan rentang penerapan bisnis disimpan terpisah. Penerapan Q3 pada Januari–Oktober sah sesuai BR-SKP-009, tanpa memalsukan coverage dokumen Q3.
+- Jika tidak ada sumber relevan yang dapat dipertanggungjawabkan, tampilkan gap/review; jangan mengisi nol atau membuat predikat sendiri.
 - Tidak menerapkan batas universal rolling 36 bulan.
 
 **Definisi full-month deterministik:**
@@ -118,16 +128,16 @@ Immutability:
 - Awal setiap segment harus hari pertama bulan.
 - Akhir setiap segment harus hari terakhir bulan.
 - Jumlah bulan dihitung secara inklusif dari pasangan tahun/bulan, bukan selisih hari.
-- Pergantian histori pada hari pertama bulan dapat memecah segment; histori sebelumnya harus mencakup sampai akhir bulan sebelumnya.
-- Boundary tanggal lain menghasilkan `PARTIAL_MONTH_REQUIRES_REVIEW`.
-- Segment pecahan bulan tidak dihitung otomatis.
+- Pilih jabatan/jenjang dengan TMT terbesar yang berlaku per bulan (BR-JAB-001); beberapa perubahan dalam bulan sama memakai TMT paling akhir bulan itu. Bulan terdahulu tidak memakai jenjang yang baru berlaku bulan berikutnya.
+- TMT pada awal, tengah, atau akhir bulan memperlakukan bulan perubahan sebagai satu bulan penuh dengan jabatan/jenjang terbaru, tanpa prorata hari. Tanggal TMT asli tetap disimpan.
+- `PARTIAL_MONTH_REQUIRES_REVIEW` hanya berlaku untuk requested range dengan batas hari parsial yang belum diputuskan, bukan untuk TMT tengah/akhir bulan yang telah dikonfirmasi client.
 
-Segmentasi mempertimbangkan batas tahun, coverage sumber, requested range, dan histori jabatan.
+Segmentasi mempertimbangkan batas tahun, rentang penerapan sumber, requested range, dan hasil resolusi jabatan/jenjang per bulan. Antarbulan dapat memakai koefisien berbeda; tidak ada prorata hari di dalam satu bulan atau overlap bulan.
 
 ### Histori jabatan/JF
 
-- Resolver membaca seluruh histori verified yang relevan dengan rentang, bukan hanya jabatan pada tanggal akhir case.
-- Gunakan histori yang tidak superseded dan simpan ID serta salinan atributnya pada hasil.
+- Resolver membaca histori verified dan memilih TMT JABATAN -> SK terbesar yang berlaku pada setiap bulan. Bila perubahan berulang dalam bulan sama, gunakan TMT paling akhir. Urutan record, ID database, tanggal import, dan urutan Excel bukan dasar resolusi.
+- Gunakan histori yang tidak superseded; simpan ID, TMT asli, referensi SK, sumber dan salinan atributnya. Koefisien mengikuti jenjang terpilih per bulan; TMT tengah/akhir bulan berlaku untuk satu bulan penuh tanpa mengubah hasil bulan sebelumnya.
 - Histori hilang atau ambigu menghasilkan issue terstruktur.
 - Non-JF tanpa dasar koefisien sah tidak diberi mapping JF otomatis.
 - Master yang kemudian dinonaktifkan tidak menghapus histori verified atau hasil lama.
@@ -168,7 +178,7 @@ Perubahan rule set case:
 Semua status tersebut merupakan **status kalkulasi/review**, bukan business finalization.
 
 - `PREVIEW` tetap bukan hasil resmi meskipun angka lengkap.
-- Pending rounding produksi merupakan pembatas global `PREVIEW_ONLY`; tidak perlu membuat setiap run berstatus review semata-mata karena pembatas global tersebut.
+- Rounding BR-KONV-004 telah disahkan client. Label `PREVIEW_ONLY` tetap membatasi lifecycle hasil Phase 02, bukan menandakan rounding masih pending; tidak memperkenalkan business finalization.
 - Angka, input snapshot, dan calculation trace run lama immutable.
 - Perubahan status/review metadata dibatasi service dan diaudit; bukan izin mengedit hasil.
 - Penyelesaian issue menghasilkan run baru, bukan menghapus issue dari histori run lama.
@@ -179,8 +189,8 @@ Minimal kode:
 
 | Kode | Dampak |
 |---|---|
-| `ANNUAL_SUBSET_REQUIRES_REVIEW` | Preview numerik boleh |
-| `PARTIAL_MONTH_REQUIRES_REVIEW` | Segment terdampak tidak dihitung |
+| `ANNUAL_SUBSET_REQUIRES_REVIEW` | Kode historis desain; tidak diterbitkan untuk annual subset yang sah menurut BR-SKP-002 |
+| `PARTIAL_MONTH_REQUIRES_REVIEW` | Requested range parsial di luar keputusan TMT; tidak berlaku hanya karena TMT tengah/akhir bulan |
 | `RULE_VALIDITY_REQUIRES_REVIEW` | Preview hanya jika input numerik tersedia |
 | `MISSING_POSITION_HISTORY` | Segment terdampak tidak dihitung |
 | `AMBIGUOUS_POSITION_HISTORY` | Segment terdampak tidak dihitung |
@@ -219,7 +229,7 @@ Browser tidak authoritative untuk:
 - Status dan issue hasil resolusi
 - `revision_number`
 
-Field turunan tidak diterima sebagai input penyimpanan. Server membaca ulang dependency, melakukan segmentasi, resolve rule/histori, dan menghitung ulang sebelum save.
+Field turunan tidak diterima sebagai input penyimpanan. Server membaca ulang dependency, memvalidasi pemilihan sumber terhadap prioritas annual/triwulan dan jabatan terbaru, melakukan segmentasi, resolve rule/histori, dan menghitung ulang sebelum save. Pilihan browser tidak boleh mengalahkan sumber yang diwajibkan aturan bisnis.
 
 Pada transaksi save wajib berlaku:
 
@@ -233,17 +243,33 @@ Jika case, predecessor, pilihan rule, atau dependency berubah sejak preview, sav
 
 Gunakan exact rational arithmetic melalui `brick/math`, dengan input decimal string.
 
+**CALCULATION:** simpan/hitung presisi penuh, jangan membulatkan setiap baris, jumlahkan hasil presisi penuh, lalu rounding hanya pada output/total akhir dengan ROUND_HALF_UP maksimum tiga angka desimal.
+
+**DISPLAY:** hapus trailing zero dan gunakan koma desimal: `100.000 -> 100`, `18.750 -> 18,75`, `12.500 -> 12,5`, `20.833 -> 20,833`. Formatting tidak mengubah nilai calculation dan tidak menjadi operand penjumlahan.
+
 `AK = month_count / 12 × predicate_factor × annual_coefficient`
 
 - Simpan numerator/denominator eksak untuk line dan total.
 - Total eksak merupakan jumlah nilai eksak.
-- Profil tampilan berversi: **PREVIEW_ONLY, tiga desimal, half-up**.
+- BR-KONV-004 disahkan: jumlahkan nilai presisi penuh tanpa membulatkan komponen; bulatkan satu kali pada output total akhir, maksimal tiga desimal, ROUND_HALF_UP (digit berikutnya 5 menaikkan digit yang dipertahankan).
+- Profil tampilan berversi tetap **PREVIEW_ONLY** untuk scope lifecycle. Gunakan koma desimal dan trim trailing zeros yang tidak signifikan; formatting baris tidak mengubah nilai tersimpan maupun operand total.
 - Nilai tampilan tidak dipakai sebagai dasar rekalkulasi.
 - Jangan memakai PHP float atau angka browser sebagai sumber authoritative.
 - Jelaskan potensi selisih antara jumlah baris bulat dan pembulatan total eksak.
-- Kebijakan preview tidak menetapkan `BR-KONV-004`.
+- BR-KONV-004 kini keputusan bisnis client; penetapannya tidak memperluas scope menjadi finalisasi PAK.
+
+Contoh presentation: `100.000 -> 100`, `18.750 -> 18,75`, `12.500 -> 12,5`, `20.830 -> 20,83`, `20.833 -> 20,833`, `0.500 -> 0,5`, `0.000 -> 0`. Contoh rounding total: `18.7544 -> 18,754`, `18.7545 -> 18,755`, `18.7546 -> 18,755`. Nilai baris yang dibulatkan untuk display tidak pernah dijumlahkan sebagai total.
 
 Golden Nurmaulida tetap numeric fixture: koefisien 25 berasal dari bukti contoh, bukan mapping JF rekaan.
+
+### Regime TMT, personnel source, dan guidance
+
+- BR-REGIME-001: **TMT Jabatan < 2023-01-01 = LEGACY / AK Integrasi; TMT Jabatan >= 2023-01-01 = PERFORMANCE CONVERSION / konversi predikat kinerja.** AK Integrasi adalah nilai existing, tidak dihitung ulang/dimasukkan ke total oleh Conversion Engine Phase 02. Jangan membuat calculator aturan lama; kasus tersebut ditahan untuk review.
+- Ini klasifikasi bisnis saat ini, bukan asumsi regulasi tidak akan berubah. Rule/version dan provenance tetap dapat dikembangkan/diaudit; tidak ada pemilihan rule set otomatis.
+- BR-DATA-001: dokumen resmi nantinya membutuhkan KARPEG/Nomor Seri Karpeg, TEMPAT LAHIR, TGL LAHIR, TMT PANGKAT/GOL, TMT JABATAN -> SK dari DUK/full personnel source. Catat sumber/batch/versi atau dokumen, field asli, tanggal acuan, dan verifikasi. TMT pangkat, TMT jabatan, tanggal SK dan nomor SK tetap terpisah. Tidak mengubah importer pada checkpoint ini.
+- Default Unit Kerja: **Balai Besar Penjaminan Mutu Pendidikan Provinsi Jawa Timur**. Default Instansi: **Kementerian Pendidikan Dasar dan Menengah**. Tandai provenance sebagai default client, bukan bukti historis verified; snapshot lama tetap utuh.
+- BR-REF-001: materi resmi/PPT perlu tersedia sebagai referensi Admin PAK: ketentuan AK perpindahan ke JF, konversi predikat, kebutuhan AK KP/KJ model konversi, dan tabel lain yang diidentifikasi dari sumber. Simpan metadata referensi/versi/lingkup.
+- Bedakan rule engine Phase 02 (predikat, jenjang, faktor/koefisien versi eksplisit, konversi, rounding), guidance administrator, dan calculator fase berikutnya (perpindahan, AK Dasar, target KP/KJ, integrasi/akumulasi/penetapan). Tabel referensi tidak otomatis menjadi calculator aktif. Tidak ada implementasi UI guidance pada checkpoint dokumentasi ini.
 
 ## 3. Proposed data, services, permissions, dan UI
 
@@ -305,7 +331,7 @@ Kontrak utama:
 |---|---|
 | Baca SKP/evidence | `pak.skp.view` dan akses person yang relevan |
 | Catat/revisi OFFICIAL | `pak.skp.manage` |
-| Catat/revisi PROVISIONAL | `pak.skp.manage` + `pak.skp.provisional` |
+| Kontrak permission provisional historis; bukan alur input aktif Phase 02 | `pak.skp.manage` + `pak.skp.provisional` tetap dipertahankan |
 | Lihat hasil konversi | `pak.conversion.view` + `pak.case.view` |
 | Preview/save konversi | `pak.conversion.calculate`, `pak.conversion.view`, `pak.case.view`, `pak.case.update`, `pak.skp.view`, `pak.employee.view`, `pak.rule-set.view` |
 | Ubah rule case | `pak.case.update` + `pak.rule-set.view` serta dependency read permissions |
@@ -409,7 +435,7 @@ Seluruh checkpoint tetap di branch **`feature/pak-phase-02`**. Checkpoint bukan 
 
 | Checkpoint | Deliverable dan gate |
 |---|---|
-| **02A — SKP/source** | Model sumber, coverage, correction chain, provenance, official/provisional authorization, kontrak evidence immutable; tests lifecycle |
+| **02A — SKP/source** | Model sumber, coverage, correction chain, provenance, authorization sumber resmi/retensi historis, kontrak evidence immutable; tests lifecycle |
 | **02B — Rule + calculator** | Child rules, permanent lock, explicit lookup, exact arithmetic, presentation policy; golden numeric tests |
 | **02C — Run/segmentation** | Full-month resolver, issues, statuses, replacement chain, server-authoritative save, equality rule case/run; integration tests |
 | **02D — UI/evidence/audit** | Filament, private upload/download, audit privacy, comparison, dashboard review; Livewire dan authorization tests |
@@ -422,9 +448,14 @@ Seluruh checkpoint tetap di branch **`feature/pak-phase-02`**. Checkpoint bukan 
 - Golden Nurmaulida: **4.167, 25, 25, 20.833; total eksak 75**.
 - Tidak membuat mapping JF agar koefisien golden cocok.
 - TC-PAK-002/003/004/005/006/027 sesuai boundary konversi.
-- Empat triwulan, annual, provisional, annual-subset.
+- Empat triwulan, annual, annual-subset, tanpa source provisional terpisah; bukti historis tetap dipertahankan.
 - Bulan Februari/tahun kabisat, pergantian tahun, satu bulan, dan akhir bulan.
-- Boundary histori awal bulan dapat disegmentasi; tengah bulan tidak dihitung.
+- TMT awal/tengah/akhir bulan menggunakan jabatan/jenjang terbaru untuk bulan penuh; requested range parsial lain tetap review.
+- Annual tersedia mengalahkan triwulan termasuk subset; tanpa annual memakai triwulan terakhir relevan; Januari–Oktober menggunakan Q3 tanpa provisional ketika Q4/annual belum ada.
+- Beberapa record annual dan histori dipilih menurut TMT terbesar yang berlaku pada bulan tersebut, termasuk beberapa perubahan dalam bulan sama; bukan urutan record/ID/import/Excel.
+- Annual datang setelah run triwulan: angka dan source evidence lama tidak berubah; tidak ada auto-update/replacement. Kebijakan refresh/revision tetap pending BR-SKP-008.
+- AK Integrasi existing tidak dihitung ulang atau ditambahkan engine Phase 02; klasifikasi regime menyimpan provenance TMT dan versi.
+- ROUND_HALF_UP total-only, pembeda jumlah raw vs jumlah display, trim trailing zeros, serta seluruh contoh BR-KONV-004.
 - Semua review issue code, hasil nullable, dan larangan total semu.
 - Browser memalsukan faktor, koefisien, bulan, jenjang, AK, total, status, dan revision number: ditolak/tidak dipercaya; hasil disusun server.
 - Rule case berubah setelah preview: save ditolak.
@@ -455,7 +486,7 @@ Seluruh checkpoint tetap di branch **`feature/pak-phase-02`**. Checkpoint bukan 
 
 **Security, audit, dan compatibility**
 
-- Official/provisional permission matrix dan dependency read permissions.
+- Permission matrix sumber resmi/retensi historis dan dependency read permissions; permission provisional yang dipertahankan tidak membuka source provisional baru.
 - Super Admin dan Admin PAK memperoleh kelima permission secara additive/idempotent.
 - Admin SDM/Pegawai tidak mendapat grant otomatis; custom permissions tidak berkurang.
 - Audit tidak mengandung binary evidence, seluruh employee snapshot, credential/token, atau storage path sensitif.
@@ -470,7 +501,7 @@ SQLite untuk suite rutin; MySQL staging wajib untuk locking/concurrency dan cons
 
 ### UAT dan acceptance
 
-Tim SDM memverifikasi sumber, provenance, revisi, annual-subset, provisional, segmentasi, golden numerik, trace, tampilan pending, private evidence, dan metric review.
+Tim SDM memverifikasi sumber, provenance, revisi, annual-subset, fallback tanpa provisional terpisah, segmentasi per bulan, golden numerik, trace, tampilan pending BR-SKP-008, private evidence, dan metric review.
 
 UAT juga memeriksa SDM-only, PAK-only, mixed permissions, inactive account, dua workspace, dan operasi SDM existing.
 
@@ -484,27 +515,26 @@ Mengikuti status pada dokumen repository:
 
 - `BR-TERM-001/002`: pemisahan istilah.
 - `BR-ACTOR-001`: pengelolaan oleh Tim SDM.
-- `BR-SKP-001–007`: evaluasi, sumber, segmentasi, provisional, dan retensi.
+- `BR-SKP-001–007/009/010`: evaluasi, prioritas annual/subset dan triwulan terakhir, pemilihan annual terkait jabatan terbaru, non-overlap, pengecualian provisional, dan retensi.
 - `BR-PERIOD-002`: explicit date range.
 - `BR-PRED-002`, `BR-KOEF-002/003`: versioning, master lookup, snapshot.
-- `BR-KONV-003/005`: precision dan banyak detail.
+- `BR-KONV-003/004/005`: precision, ROUND_HALF_UP total-only dengan trimming, dan banyak detail.
+- `BR-JAB-001`, `BR-REGIME-001`, `BR-DATA-001`, `BR-REF-001`: jenjang terbaru/bulan penuh, regime TMT, kebutuhan provenance personnel/default organisasi, dan pemisahan guidance dari engine.
 - `BR-CASE-001–003`: case, identity, snapshot.
 - `BR-AUDIT-001–003`: provenance dan audit.
 
-Keputusan teknis correction/replacement chain, permission baseline, dan audit privacy dicatat sebagai kontrak Phase 02. Tidak mengubah status regulasi atau rule pending.
+Keputusan teknis correction/replacement chain, permission baseline, dan audit privacy tetap. Pembaruan client 23 Oktober 2026 mengunci annual subset, jabatan terbaru/TMT tengah bulan, dan BR-KONV-004; pending lain tidak berubah dan tidak ada klaim verifikasi regulasi baru.
 
 ### PENDING BUSINESS DECISION
 
 | Area | Batas Phase 02 |
 |---|---|
-| `BR-KONV-004` | Three-decimal half-up hanya `PREVIEW_ONLY` |
 | Faktor, koefisien, formula berstatus REFERENCE | Tidak otomatis menjadi master produksi yang disahkan |
-| Annual untuk subset tahun | Preview dengan issue review |
 | Dasar koefisien Nurmaulida | Numeric fixture saja |
-| Pecahan bulan | Tidak dihitung otomatis |
+| Requested range dengan batas hari parsial selain akibat TMT | Belum dikunci; TMT tengah/akhir bulan sendiri sudah dihitung bulan penuh |
 | Lintas versi regulasi | Tidak ada automatic resolver |
 | `BR-PERIOD-003` | Tidak memaksakan rolling 36 bulan |
-| `BR-SKP-008` | Tidak mengimplementasikan koreksi administratif PAK final |
+| `BR-SKP-008` | Kebijakan refresh/revision calculation/draft triwulan saat annual tersedia kemudian; tidak ada auto-update dan bukti sumber lama tetap |
 | `BR-APPOINT-008`, `BR-KJ-005`, `BR-BAL-003/004` | Tidak disentuh |
 | Retensi evidence | Tidak ada penghapusan otomatis |
 

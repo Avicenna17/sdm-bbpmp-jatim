@@ -5,6 +5,8 @@
 **Tanggal:** 17 Oktober 2026  
 **Status:** Draft untuk review implementasi
 
+**Pembaruan 23 Oktober 2026:** keputusan client untuk Phase 02 dicatat pada BR-SKP-002/004/005/006/009/010, BR-JAB-001, BR-REGIME-001, BR-DATA-001, BR-REF-001, dan BR-KONV-004. Status APPROVED pada pembaruan ini berarti konfirmasi bisnis client, bukan klaim verifikasi regulasi baru. Prioritas regulasi resmi tetap berlaku; checkpoint ini hanya dokumentasi.
+
 ---
 
 ## 1. Tujuan
@@ -126,7 +128,7 @@ Dalam satu tahun pegawai dapat mempunyai:
 ## BR-SKP-002 — Evaluasi Akhir sebagai sumber terakhir
 **Status:** APPROVED
 
-Jika Evaluasi Akhir resmi telah tersedia dan digunakan untuk satu tahun penuh, data predikat Evaluasi Akhir menjadi sumber utama untuk periode tahunan tersebut.
+Jika Evaluasi Akhir resmi untuk tahun bersangkutan tersedia, gunakan predikat Evaluasi Akhir sebagai sumber utama, termasuk untuk subset bulan dalam tahun yang sama. Sumber ini mengalahkan triwulan. Simpan coverage asli sumber dan rentang bulan konversi secara terpisah; annual-for-subset bukan lagi PENDING BUSINESS DECISION.
 
 ## BR-SKP-003 — Periode PAK fleksibel
 **Status:** APPROVED
@@ -145,26 +147,21 @@ Contoh valid:
 
 Jika satu rentang PAK mencakup beberapa sumber predikat, rentang harus dipecah menjadi segment non-overlap.
 
-Contoh:
-
-```text
-Jan-Mar  -> sumber TW I
-Apr-May  -> sumber TW II
-```
+Segmentasi mengikuti prioritas BR-SKP-002/009, bukan otomatis membagi setiap triwulan menjadi sumber tersendiri. Contoh: Januari–Oktober menggunakan Q3 jika Evaluasi Akhir/Q4 belum tersedia; coverage asli Q3 tetap Juli–September, sedangkan rentang penerapannya Januari–Oktober dicatat terpisah. Rentang lintas tahun tetap memisahkan sumber setiap tahun.
 
 ## BR-SKP-005 — Tidak boleh double counting
 **Status:** SYSTEM
 
-Bulan/periode yang sama tidak boleh dihitung dua kali ke dalam AK final pada PAK Case yang sama.
+Bulan/periode yang sama tidak boleh dihitung dua kali pada satu kalkulasi/run PAK Case, termasuk preview. Satu bulan hanya boleh mendapat satu sumber predikat terpilih. Record annual/triwulan boleh coexist dalam penyimpanan, tetapi tidak boleh sama-sama memberikan predikat pada bulan yang sama dalam kalkulasi.
 
 Jika periode Jan-Jun telah digunakan dari evaluasi periodik, sistem tidak boleh menjumlahkan kembali Jan-Jun dari Evaluasi Akhir untuk case yang sama.
 
-## BR-SKP-006 — Input darurat/provisional
-**Status:** APPROVED
+## BR-SKP-006 — Fallback tanpa provisional terpisah
+**Status:** RESOLVED / APPROVED
 
-Apabila dokumen SKP resmi untuk bulan yang dibutuhkan belum terbit, Tim SDM dapat memasukkan predikat provisional/darurat.
+Tidak ada konsep provisional source terpisah pada alur SKP Phase 02. Gunakan Evaluasi Akhir jika tersedia, termasuk subset tahun; jika belum tersedia gunakan triwulan terakhir relevan (Januari–Oktober memakai Q3). Jika sumber relevan tidak tersedia, lakukan review tanpa membuat predikat provisional. BR-SKP-002/005/009 mengatur prioritas dan satu sumber per bulan.
 
-Minimal wajib menyimpan:
+Untuk retensi bukti provisional historis dari desain/proses sebelumnya, metadata berikut tetap dipertahankan; ini bukan kontrak input provisional baru:
 
 - person;
 - periode;
@@ -185,12 +182,12 @@ Record dapat:
 - ditautkan ke data resmi pengganti;
 - atau dikoreksi melalui mekanisme versioning.
 
-## BR-SKP-008 — Perbedaan provisional vs resmi
-**Status:** PENDING
+## BR-SKP-008 — Evaluasi Akhir terbit setelah calculation triwulan
+**Status:** PENDING BUSINESS DECISION — kebijakan refresh/revision calculation lama
 
-Jika predikat resmi yang terbit berbeda dari provisional dan PAK telah difinalisasi, prosedur koreksi administrasi harus dikonfirmasi client.
+**RESOLVED:** fallback SKP adalah Evaluasi Akhir (juga subset tahun), atau triwulan terakhir relevan jika Evaluasi Akhir belum tersedia; Januari–Oktober memakai Q3. Tidak ada provisional source terpisah. Satu bulan hanya satu sumber predikat.
 
-Sistem V1 harus menyimpan bukti keduanya dan tidak overwrite diam-diam.
+**PENDING:** jika conversion/draft telah dihitung memakai triwulan lalu Evaluasi Akhir tersedia kemudian, kebijakan refresh/revision terhadap calculation lama belum dikunci, termasuk kapan dan bagaimana penggantian harus dilakukan. Phase 02 tidak melakukan auto-update/recalculation atau otomatis mengganti run lama. Source evidence, predikat, coverage, range penerapan dan provenance saat calculation tetap dicatat. Kontrak teknis revision chain tidak dengan sendirinya mengesahkan kebijakan bisnis penggantian ini.
 
 ---
 
@@ -314,16 +311,26 @@ Perhitungan internal menggunakan decimal presisi.
 Dilarang bergantung pada binary floating point tanpa kontrol.
 
 ## BR-KONV-004 — Rounding
-**Status:** SYSTEM / PENDING detail
+**Status:** APPROVED — konfirmasi client 23 Oktober 2026
 
-Output dokumen saat ini mengikuti pola tiga digit desimal pada kasus seperti:
+**CALCULATION:** simpan dan hitung dengan presisi penuh (exact rational pada engine). Jangan membulatkan setiap baris/komponen. Jumlahkan hasil presisi penuh, kemudian lakukan rounding hanya pada output/total akhir, maksimal tiga angka desimal dengan ROUND_HALF_UP. Jika digit berikutnya tepat 5, digit terakhir yang dipertahankan dinaikkan.
+
+**DISPLAY:** hapus trailing zero yang tidak signifikan dan gunakan koma desimal. Representasi display baris bukan nilai calculation dan tidak boleh digunakan sebagai operand total; formatting tidak mengubah nilai yang dihitung/disimpan. Pembatasan desimal untuk presentation tidak membulatkan komponen dalam calculation.
 
 ```text
-4.166666... -> 4.167
-20.833333... -> 20.833
+100.000 -> 100
+18.750 -> 18,75
+12.500 -> 12,5
+20.830 -> 20,83
+20.833 -> 20,833
+0.500 -> 0,5
+0.000 -> 0
+18.7544 -> 18,754
+18.7545 -> 18,755
+18.7546 -> 18,755
 ```
 
-Kebijakan rounding final harus terpusat dan dapat diuji.
+Kebijakan terpusat dan berversi. Ini mengunci BR-KONV-004, tetapi tidak memperkenalkan finalisasi/penetapan PAK pada Phase 02; run tetap PREVIEW/REQUIRES_REVIEW/SUPERSEDED.
 
 ## BR-KONV-005 — Satu PAK banyak konversi
 **Status:** APPROVED
@@ -751,7 +758,7 @@ Aksi penting menyimpan:
 
 | ID | Pertanyaan |
 |---|---|
-| BR-SKP-008 | Apa prosedur koreksi jika provisional berbeda dari resmi setelah PAK final? |
+| BR-SKP-008 | Bagaimana kebijakan refresh/revision calculation triwulan lama ketika Evaluasi Akhir kemudian tersedia? Fallback sumber sudah resolved; tidak ada auto-update calculation lama. |
 | BR-PERIOD-003 | Apakah “3 tahun terakhir” selalu rolling 36 bulan? |
 | BR-APPOINT-008 | Terminologi final Pengangkatan Pertama vs Perpindahan dari Jabatan Lain |
 | BR-KJ-005 | Jika gagal Ukom, apakah PAK dapat dipakai ulang? |
@@ -762,3 +769,55 @@ Pending rules tidak boleh diperlakukan Codex sebagai fakta final.
 ## Klarifikasi teknis Foundation
 
 Klarifikasi teknis BR-KJ-006 tanpa perubahan status: sumber published Peta Jabatan adalah published_batch_id pada position_datasets, dengan position_version/published_at pada import_batches. Integrasi berikutnya menyimpan versi/nilai sumber. Business rule PENDING tetap.
+
+# U. Keputusan client Phase 02 — 23 Oktober 2026
+
+## BR-SKP-009 — Triwulan terakhir relevan
+**Status:** APPROVED
+
+Jika Evaluasi Akhir belum tersedia, gunakan hasil SKP triwulan terakhir yang relevan untuk periode yang diminta. Januari–Oktober ketika Q4/Evaluasi Akhir belum tersedia menggunakan predikat Q3 untuk Januari–Oktober, bukan Q1+Q2+Q3 ditambah provisional Oktober. Coverage dokumen Q3 tidak diubah; simpan rentang penerapan dan alasan pemilihan secara terpisah. Jika sumber relevan tidak tersedia atau tidak dapat dibuktikan, tahan kalkulasi untuk review; jangan menebak predikat.
+
+## BR-SKP-010 — Beberapa record Evaluasi Akhir
+**Status:** APPROVED
+
+Jika terdapat beberapa record Evaluasi Akhir akibat perubahan jabatan, gunakan record/predikat terkait jabatan dengan TMT terbesar/terbaru yang berlaku pada bulan yang dihitung, sesuai BR-JAB-001. Jika ada lebih dari satu perubahan dalam bulan itu, gunakan TMT paling akhir bulan tersebut. Jangan memilih berdasarkan urutan record, ID database, tanggal import, waktu upload, atau urutan Excel. Simpan kaitan evaluasi dengan histori terverifikasi dan provenance pemilihannya; record lain dipertahankan. Jika hubungan/TMT ambigu, lakukan review, bukan tie-break berdasarkan urutan input.
+
+## BR-JAB-001 — Jabatan/jenjang terbaru dan basis bulan
+**Status:** APPROVED
+
+Untuk setiap bulan yang dihitung, pilih jabatan/jenjang dengan TMT terbesar/terbaru yang berlaku pada bulan tersebut. Jika lebih dari satu perubahan terjadi dalam bulan yang sama, gunakan record dengan TMT paling akhir pada bulan tersebut. Jabatan yang baru berlaku pada bulan berikutnya tidak diterapkan mundur ke bulan sebelumnya. Pemilihan bukan berdasarkan urutan record, ID database, tanggal import, waktu upload, atau urutan Excel. Acuan TMT JABATAN -> SK dari data kepegawaian/DUK terverifikasi; simpan TMT asli, referensi SK, sumber, dan hasil resolusi per bulan.
+
+PAK menggunakan basis bulan, bukan hari. TMT perubahan pada pertengahan atau akhir bulan tetap memperlakukan seluruh bulan tersebut dengan jabatan/jenjang terbaru pada bulan itu. Tidak ada prorata hari atau pembagian koefisien lama/baru di dalam satu bulan. Antarbulan dapat memakai jenjang berbeda sesuai TMT yang berlaku masing-masing; segmentasi mengikuti hasil resolusi bulanan. Ini memperjelas bahwa "terbaru" bukan satu jenjang terakhir untuk seluruh rentang lintas bulan, dan wajib mempunyai trace serta test.
+
+Keputusan ini tidak mengubah tanggal histori asli, tidak menciptakan histori overlap, dan tidak menentukan trigger perubahan administratif/saldo pada BR-BAL-003. Perlakuan requested range dengan batas hari parsial selain akibat TMT ini belum dikunci.
+
+## BR-REGIME-001 — Kelompok mekanisme berdasarkan TMT Jabatan
+**Status:** APPROVED
+
+- **TMT Jabatan < 2023-01-01 = LEGACY / AK Integrasi.** AK Integrasi merupakan nilai existing dari data/rekap client, tidak dihitung ulang oleh Conversion Engine Phase 02 dan tidak dijumlahkan ke total conversion.
+- **TMT Jabatan >= 2023-01-01 = PERFORMANCE CONVERSION / konversi predikat kinerja.**
+- Jangan membuat calculator aturan lama pada Phase 02.
+
+Tanggal tersebut adalah keputusan bisnis saat ini, bukan asumsi aturan pemerintah tidak berubah. Provenance TMT, regime, referensi, dan rule/version harus tersimpan dan dapat diaudit. Tetap satu rule set dipilih eksplisit; tidak memperkenalkan automatic rule-set resolver. Jika kasus kelompok lama memerlukan mekanisme di luar konversi biasa, lakukan review tanpa mengimplementasikan calculator aturan lama pada Phase 02.
+
+## BR-DATA-001 — Atribut personnel dan default organisasi
+**Status:** APPROVED
+
+Kebutuhan dokumen resmi mendatang: KARPEG/Nomor Seri Karpeg, TEMPAT LAHIR, TGL LAHIR, TMT PANGKAT/GOL, serta TMT JABATAN -> SK dari DUK/full personnel source. Catat sumber/batch/versi atau dokumen, field asli, tanggal acuan, actor/waktu verifikasi, dan nilai yang digunakan. TMT pangkat dan TMT jabatan tetap berbeda; sk_date, sk_number, dan tmt tidak disamakan. Data belum tersedia tidak ditebak.
+
+Default Unit Kerja: **Balai Besar Penjaminan Mutu Pendidikan Provinsi Jawa Timur**.
+
+Default Instansi: **Kementerian Pendidikan Dasar dan Menengah**.
+
+Default harus diberi provenance sebagai default organisasi client, bukan diklaim sebagai bukti organisasi historis yang terverifikasi. Snapshot historis tetap dipertahankan. Checkpoint ini tidak mengubah importer, mapping sumber executable, atau schema.
+
+## BR-REF-001 — Rule engine versus guidance administrator
+**Status:** APPROVED
+
+Materi dokumen resmi/PPT perlu tersedia sebagai referensi Admin PAK dengan judul, sumber, versi/tanggal, dan lingkup penggunaan. Bedakan:
+
+- Conversion Engine Phase 02: rule pemilihan predikat, jabatan/jenjang, faktor dan koefisien dari master versi eksplisit, formula konversi, serta rounding.
+- Reference/guidance: ketentuan umum pemberian AK perpindahan ke dalam JF, penjelasan perhitungan konversi, tabel kebutuhan kenaikan pangkat/jabatan model konversi, dan tabel lain yang telah diidentifikasi dari dokumen sumber.
+- Phase berikutnya: calculator perpindahan, AK Dasar, target KP/KJ, integrasi/akumulasi dan penetapan sesuai scope masing-masing.
+
+Ketersediaan tabel sebagai referensi tidak otomatis mengaktifkannya sebagai calculator. Status REFERENCE angka master tidak otomatis menjadi APPROVED hanya karena requirement guidance ini. Checkpoint hanya mendokumentasikan kebutuhan, tidak membuat UI/file ingestion/calculator.

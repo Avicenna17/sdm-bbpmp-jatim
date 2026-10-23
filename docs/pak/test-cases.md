@@ -4,6 +4,8 @@
 **Versi:** 1.0  
 **Tanggal:** 17 Oktober 2026
 
+**Pembaruan spesifikasi:** 23 Oktober 2026, konfirmasi client Phase 02. Ini test specification dokumenter, bukan test executable. Bagian Phase 03+ tetap referensi fase berikutnya.
+
 ---
 
 ## 1. Tujuan
@@ -33,7 +35,11 @@ Display contoh:
 20.833333... -> 20.833
 ```
 
-Rounding policy final harus konsisten.
+BR-KONV-004 telah APPROVED.
+
+**CALCULATION:** simpan/hitung presisi penuh, jangan membulatkan setiap baris, jumlahkan hasil presisi penuh; rounding hanya output/total akhir dengan ROUND_HALF_UP maksimum tiga angka desimal.
+
+**DISPLAY:** hapus trailing zeros dan gunakan koma desimal: 100.000 -> 100; 18.750 -> 18,75; 12.500 -> 12,5; 20.833 -> 20,833. Formatting tidak mengubah calculation. Angka bertitik dalam formula adalah notasi internal; display bukan operand total.
 
 ---
 
@@ -43,6 +49,8 @@ Rounding policy final harus konsisten.
 
 **Priority:** CRITICAL  
 **Source:** dokumen PAK fisik BBPMP Jatim
+
+**Scope Phase 02:** numeric fixture saja sampai dasar resmi mapping jabatan/jenjang dapat dibuktikan. Jangan membuat mapping JF fiktif untuk mendapatkan koefisien 25. Resolusi produksi tetap menggunakan data terverifikasi. Expected Akumulasi/PAK di bawah hanya untuk Phase berikutnya.
 
 ### Given
 
@@ -99,9 +107,12 @@ Display = 20.833
 ### Expected New Conversion Total
 
 ```text
-4.167 + 25 + 25 + 20.833
-= 75.000
+(2/12 × 25) + 25 + 25 + (10/12 × 25)
+= 75 (exact)
+Display total = 75
 ```
+
+Display line 2023 = 4,167 dan 2026 = 20,833 tidak dipakai untuk penjumlahan total. Kesamaan total 75 dari baris bulat pada contoh ini tidak membuktikan strategi penjumlahan tersebut benar; lihat TC-PAK-035.
 
 ### Expected Akumulasi
 
@@ -163,9 +174,9 @@ Assertions:
 
 ---
 
-# 5. Periode Jan–Mei dengan Sumber Berbeda
+# 5. Periode Jan–Mei dengan Triwulan Terakhir Relevan
 
-## TC-PAK-003 — Segmentasi SKP Jan–Mei
+## TC-PAK-003 — Prioritas Sumber Jan–Mei
 
 ### Given
 
@@ -176,7 +187,7 @@ Ahli Muda
 Coefficient = 25
 ```
 
-SKP:
+SKP (Evaluasi Akhir belum tersedia; Q2 resmi telah tersedia dan relevan untuk rentang permintaan):
 
 ```text
 Jan-Mar = Baik (1.00)
@@ -192,98 +203,72 @@ Jan-Mei
 ### Expected Segment
 
 ```text
-Jan-Mar = 3 bulan
-Apr-Mei = 2 bulan
+Jan-Mei = 5 bulan memakai Q2 Sangat Baik
+Coverage asli sumber Q2 tetap Apr-Jun
 ```
 
 ### Expected AK
 
 ```text
-Jan-Mar:
-3/12 × 1.00 × 25
-= 6.25
-
-Apr-Mei:
-2/12 × 1.50 × 25
-= 6.25
-
-Total:
-12.50
+5/12 × 1.50 × 25 = 15.625
+Display total = 15,625
 ```
 
 Assertions:
 
-- [ ] TW II dipotong hanya Apr-Mei.
+- [ ] Triwulan terakhir relevan dipakai sesuai BR-SKP-009; tidak menjumlahkan Q1 dan Q2 sebagai dua predikat untuk periode yang sama.
 - [ ] Juni tidak dihitung.
-- [ ] Dua line non-overlap.
+- [ ] Coverage sumber dan range penerapan terpisah; setiap bulan hanya satu predikat.
 
 ---
 
-# 6. Jan–Oktober dengan Data Darurat
+# 6. Jan–Oktober dengan Q3
 
-## TC-PAK-004 — Provisional Oktober
+## TC-PAK-004 — Q3 Menggantikan Kebutuhan Provisional Oktober
 
 ### Given
 
 ```text
 Jenjang = Ahli Muda
 Coefficient = 25
-Jan-Sep official = Baik
-Oktober official belum tersedia
-SDM input Oktober provisional = Baik
+Q3 official = Baik
+Q4 dan Evaluasi Akhir belum tersedia
+Requested range = Jan-Okt
 ```
 
 ### Expected
 
 ```text
-Jan-Sep:
-9/12 × 1 × 25 = 18.75
-
-Okt:
-1/12 × 1 × 25 = 2.083333...
-
-Total = 20.833333...
-Display = 20.833
+10/12 × 1 × 25 = 20.833333...
+Display total = 20,833
 ```
 
 Assertions:
 
-- [ ] provisional membutuhkan alasan.
-- [ ] entered_by tersimpan.
-- [ ] source type dapat dibedakan.
-- [ ] provisional tetap dapat digunakan untuk draft/final sesuai permission.
+- [ ] Q3 menjadi sumber predikat untuk Jan–Okt; coverage asli Jul–Sep tidak diubah.
+- [ ] Tidak membuat record provisional Oktober.
+- [ ] Source reference, alasan resolusi BR-SKP-009 dan range penerapan tersimpan pada trace.
+- [ ] Tidak ada bulan overlap atau nilai display yang dipakai untuk total.
 
 ---
 
-# 7. Provisional Digantikan Resmi
+# 7. Evaluasi Akhir Tersedia Setelah Calculation Triwulan
 
-## TC-PAK-005 — Official Supersedes Provisional
+## TC-PAK-005 — Kebijakan Refresh/Revision Calculation Lama
+
+**Rule:** BR-SKP-008. **Status:** PENDING BUSINESS DECISION untuk kebijakan refresh/revision; safeguard non-mutation wajib pada Phase 02.
 
 ### Given
 
-Provisional Oktober:
-
-```text
-Baik
-```
-
-Kemudian official TW IV tersedia:
-
-```text
-Baik
-```
+Conversion/draft telah dihitung memakai Q3 dengan source evidence dan snapshot tersimpan. Evaluasi Akhir kemudian tersedia, baik predikat sama maupun berbeda.
 
 ### Expected
 
-- [ ] provisional tidak dihapus;
-- [ ] status provisional menjadi `SUPERSEDED`;
-- [ ] official memiliki link/reference;
-- [ ] draft case dapat direcalculate menggunakan official.
-
-Jika PAK sudah final:
-
-- [ ] tidak auto-overwrite hasil final;
-- [ ] flag review/correction muncul.
+- [ ] Calculation lama, angka, total, source ID, predikat dan evidence saat calculation tetap utuh.
+- [ ] Tidak ada auto-update, recalculation, atau successor otomatis hanya karena annual tersedia.
+- [ ] Fallback untuk kalkulasi baru tetap annual; tidak membuat provisional source.
+- [ ] Kebijakan kapan/bagaimana refresh/revision run lama tetap pending; jangan menganggap technical replacement chain sebagai persetujuan bisnis.
+- [ ] Correction chain sumber dan replacement chain run tetap sesuai kontrak teknis, tanpa kehilangan bukti lama.
 
 ---
 
@@ -305,12 +290,12 @@ User mencoba menambah:
 Jan-Dec 2026
 ```
 
-ke final case yang sama.
+ke kalkulasi/run case yang sama, termasuk preview Phase 02.
 
 ### Expected
 
 - [ ] validation error overlap;
-- [ ] tidak boleh finalize;
+- [ ] save run ditolak; tidak ada dua sumber memberi predikat pada bulan sama;
 - [ ] system menawarkan segment yang belum dihitung bila implementasi mendukung.
 
 ---
@@ -318,6 +303,8 @@ ke final case yang sama.
 # 9. AK Integrasi
 
 ## TC-PAK-007 — Integrasi + Konversi Jan–Jun
+
+**Scope:** penjumlahan integrasi dan konversi berikut adalah Phase 03. Phase 02 hanya menghasilkan conversion 12.5; pemisahan diuji pada TC-PAK-034.
 
 ### Given
 
@@ -800,7 +787,7 @@ Sebelum production minimal UAT:
 | TC-PAK-001 | Nurmaulida | Ya |
 | TC-PAK-002 | Full year | Ya |
 | TC-PAK-003 | Jan-Mei | Ya |
-| TC-PAK-004 | Provisional | Ya |
+| TC-PAK-004 | Jan–Oktober memakai Q3 tanpa provisional | Ya |
 | TC-PAK-006 | Overlap | Ya |
 | TC-PAK-007 | Integrasi | Ya |
 | TC-PAK-008 | KP only | Ya |
@@ -843,6 +830,54 @@ Implementasikan:
 ### UAT
 
 Dilakukan bersama Tim SDM menggunakan berkas nyata yang telah dianonimkan bila diperlukan.
+
+# 32. Spesifikasi Konfirmasi Client Phase 02 — 23 Oktober 2026
+
+Semua kasus berikut adalah spesifikasi dokumenter. Angka koefisien/faktor sintetis merupakan fixture, bukan pengesahan master produksi. Setiap kasus memeriksa source/rule/version snapshot, server-authoritative calculation, dan status run yang tetap PREVIEW/REQUIRES_REVIEW/SUPERSEDED.
+
+## TC-PAK-029 — Evaluasi Akhir mengalahkan triwulan
+
+**Rules:** BR-SKP-002/005. Given Q3 Baik (1), annual tahun yang sama Sangat Baik (1.5), koefisien fixture 25. Untuk tahun penuh, expected raw 37.5, display 37,5 dari annual. Untuk Nov–Des, expected raw 6.25, display 6,25 dari annual. Annual-subset tidak diberi issue hanya karena subset. Coverage sumber annual tetap satu tahun; requested range terpisah. Pemaksaan pilihan Q3 tidak boleh mengalahkan annual.
+
+## TC-PAK-030 — Tanpa annual, triwulan terakhir relevan
+
+**Rules:** BR-SKP-009. Given Q1 Baik, Q2 Sangat Baik resmi/relevan, annual belum tersedia, request Jan–Mei: gunakan Q2 untuk lima bulan, sesuai TC-PAK-003. Jika tidak ada sumber relevan terverifikasi, hasil ditahan untuk review, bukan predikat rekaan atau provisional otomatis.
+
+## TC-PAK-031 — Jan–Oktober menggunakan Q3
+
+**Rules:** BR-SKP-009/005. Given Q1/Q2 memiliki predikat berbeda, Q3 Baik, Q4/annual belum tersedia. Expected Q3 menjadi satu sumber untuk sepuluh bulan, raw 125/6 dengan koefisien 25, output 20,833. Tidak menjumlahkan predikat Q1/Q2 dan tidak membuat provisional Oktober. Verifikasi coverage Q3 Jul–Sep serta applied range Jan–Okt tersimpan terpisah. Setiap bulan tepat satu sumber, termasuk ketika request mencoba menambahkan annual/triwulan overlap (ditolak sesuai TC-PAK-006).
+
+## TC-PAK-032 — Beberapa Record Annual dan TMT Per Bulan
+
+**Rules:** BR-SKP-010, BR-JAB-001. Given annual terkait jabatan A (TMT 1 Januari), B (TMT 15 Oktober), dan C (TMT 25 Oktober), dengan predikat berbeda dan hubungan ke histori verified. Untuk Januari–September gunakan record terkait jabatan A; untuk seluruh Oktober gunakan C, karena TMT paling akhir yang berlaku dalam Oktober. Ubah urutan record, ID database, tanggal import, dan urutan Excel: pilihan tidak berubah. Jangan menerapkan C ke bulan sebelum Oktober. Jika hubungan/TMT tidak dapat dibuktikan, review tanpa tie-break buatan.
+
+## TC-PAK-033 — Jenjang Per Bulan dan Beberapa Perubahan Dalam Sebulan
+
+**Rule:** BR-JAB-001. Given request Jan–Okt, jenjang lama koefisien fixture 12.5 berlaku Jan–Sep, jenjang baru koefisien 25 TMT 15 Oktober; predikat terpilih Baik. Expected raw = (9/12 × 12.5) + (1/12 × 25) = 275/24; total output 11,458. Seluruh Oktober memakai 25, bukan prorata hari; Januari–September tidak memakai 25 secara retroaktif.
+
+Ulangi TMT baru 1 Oktober dan 31 Oktober: hasil sama. Tambahkan perubahan lain koefisien fixture 37.5 pada TMT 25 Oktober setelah TMT 15 Oktober: seluruh Oktober memakai 37.5; raw total = (9/12 × 12.5) + (1/12 × 37.5) = 12.5, display 12,5. Record dengan ID/urutan Excel/import paling akhir tetapi TMT lebih awal tidak menang. TMT asli dan SK tidak diubah. Tidak menghasilkan PARTIAL_MONTH_REQUIRES_REVIEW hanya karena TMT; requested range parsial lain tetap belum diputuskan.
+
+## TC-PAK-034 — Regime TMT dan AK Integrasi existing
+
+**Rules:** BR-REGIME-001, BR-INTEGRASI-002/003. TMT Jabatan < 2023-01-01 = LEGACY / AK Integrasi; TMT Jabatan >= 2023-01-01 = PERFORMANCE CONVERSION / konversi predikat kinerja. Uji tepat batas: 2022-12-31 masuk LEGACY, 2023-01-01 masuk PERFORMANCE CONVERSION. AK Integrasi 190 dari rekap client tetap nilai existing dengan provenance, tidak dihitung ulang engine Phase 02. Jangan membuat calculator aturan lama. Jika konversi biasa yang sah menghasilkan 12.5, keluaran engine hanya 12.5, bukan 202.5. Regime dan TMT disnapshot dengan versi, bukan asumsi regulasi abadi atau pemilihan rule set otomatis.
+
+## TC-PAK-035 — ROUND_HALF_UP total-only
+
+**Rules:** BR-KONV-003/004. Fixture dua komponen raw 1.2344 dan 1.2344: total raw 2.4688, output 2,469. Jika display tiap baris 1,234, jumlah display 2,468 bukan total yang benar dan wajib tidak digunakan. Uji raw total 18.7544 -> 18,754; 18.7545 -> 18,755; 18.7546 -> 18,755. Numerator/denominator dan nilai input tidak berubah oleh formatting. Rekalkulasi dari snapshot presisi penuh menghasilkan nilai identik.
+
+## TC-PAK-036 — Presentation trimming
+
+**Rule:** BR-KONV-004. Expected: 100.000 -> 100; 18.750 -> 18,75; 12.500 -> 12,5; 20.830 -> 20,83; 20.833 -> 20,833; 0.500 -> 0,5; 0.000 -> 0. Maksimal tiga desimal, koma desimal, tanpa trailing zero tidak signifikan. Formatting tidak mengubah nilai tersimpan dan tidak menyebabkan pembulatan komponen sebelum total.
+
+## TC-PAK-037 — Golden Nurmaulida numeric-only
+
+**Rules:** BR-KONV-003/004/005. Expected raw Nov–Dec 2023 = 25/6, 2024 = 25, 2025 = 25, Jan–Oct 2026 = 125/6; jumlah eksak 75, output 75. Detail display 4,167; 25; 25; 20,833. Tidak menggunakan display sebagai operand total. Jangan menambahkan mapping JF fiktif untuk koefisien 25; bila dasar mapping resmi belum terbukti, test hanya fixture numerik, bukan bukti production resolution.
+
+## TC-PAK-038 — Personnel provenance dan guidance
+
+**Rules:** BR-DATA-001, BR-REF-001. Requirement dokumen resmi mencakup KARPEG, tempat/tanggal lahir, TMT pangkat/gol, dan TMT jabatan -> SK dengan provenance. Default unit/instansi harus berlabel default client, tidak otomatis menjadi bukti historis. Tabel perpindahan/target KP/KJ yang tersedia sebagai guidance tidak mengaktifkan calculator fase berikutnya atau mengubah hasil Phase 02. Checkpoint ini tidak mengubah importer, schema, atau UI executable.
+
+UAT Phase 02 wajib mencakup TC-PAK-029–038 dan TC-PAK-006. Kasus lintas fase di matriks V1 tidak dianggap selesai hanya karena konversi Phase 02 lulus.
 
 ## Klarifikasi teknis Foundation
 
