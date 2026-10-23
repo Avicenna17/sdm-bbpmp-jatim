@@ -90,13 +90,16 @@ Contoh annual untuk subset:
 
 ### Correction chain PerformanceEvaluation
 
-Koreksi evaluasi menggunakan `previous_version_id` nullable sebagai self-reference.
+Lifecycle evaluasi minimal adalah `CURRENT` dan `SUPERSEDED`. Koreksi evaluasi menggunakan `previous_version_id` nullable sebagai self-reference yang menunjuk predecessor, bukan successor. Actor supersession disimpan sebagai `superseded_by_user_id`, bukan field ambigu `superseded_by`; successor ditelusuri melalui reverse relation `previous_version_id`.
 
 - Hanya evaluasi berstatus `CURRENT` yang boleh direvisi.
 - Service mengunci row sumber, lalu memeriksa ulang status `CURRENT` dalam transaksi.
+- Identity-defining fields immutable sepanjang ordinary correction chain: `person_id`, `source_kind`, `performance_year`, `evaluation_type`, `source_reference`, dan `source_record_identifier`. Successor ordinary correction WAJIB memiliki `source_identity_fingerprint` yang sama dengan predecessor. `PerformanceEvaluationService` memvalidasi kesamaan field identity dan fingerprint di dalam transaksi setelah predecessor dikunci, sebelum perubahan lifecycle apa pun.
+- Ordinary correction hanya mengubah content/domain fields yang diizinkan; `content_fingerprint` berubah hanya bila canonical content berubah. Jika identity-defining field harus berubah, tolak ordinary correction dan tahan sebagai identity correction/manual review di luar ordinary 02A correction flow sampai workflow/business rule tersebut disetujui. Jangan diam-diam membentuk source identity baru melalui revision chain.
+- Setelah predecessor CURRENT dikunci dan source identity divalidasi tetap sama, hitung canonical content calon successor melalui `SkpFingerprintSerializer`. Jika `content_fingerprint` sama dengan predecessor, tolak sebagai `NO_CHANGES` / no-op correction sebelum perubahan lifecycle apa pun: predecessor tetap CURRENT, tidak ada successor, `current_source_identity_fingerprint` tidak berubah, dan tidak dibuat correction audit seolah-olah terjadi perubahan data. Request dapat mengembalikan validation/domain message bahwa tidak ada perubahan data yang perlu disimpan. Revision reason saja tidak cukup untuk membuat successor jika canonical domain content tidak berubah.
 - Satu source revision hanya boleh memiliki satu correction successor.
 - Terapkan **unique constraint pada `previous_version_id`**; nilai null diperbolehkan untuk sumber awal yang independen.
-- Create successor, perubahan predecessor menjadi `SUPERSEDED`, dan audit dilakukan atomik.
+- Dalam satu transaksi: lock predecessor `CURRENT`, periksa ulang status, validasi source identity tetap sama dan canonical content berbeda (lolos guard `NO_CHANGES`), ubah predecessor menjadi `SUPERSEDED` dan set `current_source_identity_fingerprint` menjadi `NULL`, lalu create successor `CURRENT` dengan `previous_version_id` menunjuk predecessor dan `current_source_identity_fingerprint` sama dengan `source_identity_fingerprint` successor. Simpan actor, timestamp, reason, dan audit sebelum commit.
 - Dua concurrent revisions terhadap sumber yang sama: hanya satu boleh berhasil. Request lainnya ditolak setelah status diperiksa ulang atau constraint mendeteksi konflik.
 - Kegagalan transaksi tidak mengubah evaluasi lama atau meninggalkan successor parsial.
 
@@ -110,6 +113,79 @@ Immutability:
 - Supersession sumber historis mengikuti correction chain; kedatangan annual tidak otomatis menandai run triwulan lama superseded (BR-SKP-008).
 
 **Partial replacement coverage bukan correction chain.** Sumber pengganti sebagian tetap boleh coexist dengan sumber lama, tidak mengisi `previous_version_id` sebagai hubungan koreksi sebagian, dan tidak menandai seluruh coverage lama telah tergantikan. Hubungan penggunaan sumber parsial ditelusuri melalui segment dan audit yang relevan.
+
+### Phase 02A — source identity, content identity, dan import concurrency
+
+`SkpFingerprintSerializer` terpusat menjadi satu-satunya jalur pembentukan canonical `source_identity_fingerprint` dan `content_fingerprint`: SHA-256, lowercase hexadecimal, panjang 64 karakter (`CHAR(64)`). Keduanya NOT NULL pada domain PerformanceEvaluation yang valid; nullable source/content fingerprint hanya berlaku pada `pak_skp_import_rows` yang gagal sebelum identity/content dapat dibentuk. `current_source_identity_fingerprint` BUKAN hash independen: itu lifecycle guard/projection yang menyalin `source_identity_fingerprint` ketika CURRENT dan menjadi `NULL` ketika SUPERSEDED. Tidak boleh ada re-hash berbeda untuk current fingerprint. Adapter, service lain, dan client tidak membentuk source/content fingerprint dengan jalur alternatif.
+
+Identitas sumber terpisah dari isi sumber. `source_identity_fingerprint` adalah SHA-256 canonical payload dengan field berurutan:
+
+1. Schema version `skp-source-v1`.
+2. `person_id` sebagai canonical identity dari `people.id`.
+3. `source_kind`.
+4. `performance_year`.
+5. `evaluation_type`.
+6. `source_reference`.
+7. `source_record_identifier`, nullable.
+
+`source_record_identifier` merupakan identifier stabil dari sumber. Jika satu referensi memuat beberapa record untuk person/tahun/jenis evaluasi yang sama, adapter harus membuktikan identifier pembeda dari struktur sumber. Jika tidak tersedia, tahan import sebagai identity ambiguity; jangan menciptakan identifier dari predikat atau urutan baris.
+
+`content_fingerprint` adalah SHA-256 canonical payload dengan schema version `skp-content-v1`, lalu field identity di atas (termasuk versi identity), diikuti field berurutan:
+
+- `predicate_code`, `predicate_label_original`.
+- `coverage_start`, `coverage_end`.
+- `source_date`.
+- `source_position_name`, `source_functional_level_label`.
+- `source_position_tmt`.
+- `source_sk_number`, `source_sk_date`.
+
+Kedua payload memakai schema version, fixed fields/fixed ordering, UTF-8, null eksplisit, tanggal ISO `YYYY-MM-DD`, dan deterministic string normalization:
+
+- Stable source identifiers di-trim pada tepi; leading zero dan kapitalisasi dipertahankan. Identifier tidak dibentuk dari Excel row number, workbook name, batch ID, database ID, import order, atau content hash. `person_id` tetap menjadi komponen canonical employee identity, bukan pengganti identifier record sumber.
+- Descriptive/domain text yang masuk content fingerprint di-trim pada tepi dan repeated whitespace di-collapse secara deterministik. Raw/original value tetap disimpan sebagai provenance. Perubahan kosmetik whitespace saja tidak menghasilkan false conflict.
+- Content identity tidak memasukkan batch ID, nama/checksum workbook, lokasi cell, urutan baris, actor, timestamp import, status correction, atau link histori hasil verifikasi internal. Metadata provenance dan lampiran disimpan terpisah.
+
+Klasifikasi import setelah seluruh validasi lain lolos:
+
+| Source identity | Content identity | Hasil |
+|---|---|---|
+| Sama | Sama | Duplicate/idempotent; referensikan evaluasi existing dan catat provenance occurrence import |
+| Sama | Berbeda | `SOURCE_CONTENT_CONFLICT`; tidak overwrite atau auto-correction |
+| Berbeda | Apa pun | Evidence independen yang sah; bukan otomatis correction |
+
+Hash dipakai untuk pencarian; canonical payload tetap dibandingkan sebelum menyatakan identik. Kecocokan dengan revision historis tidak mengaktifkannya kembali. Konten berbeda dari `CURRENT` tetap ditahan untuk pemeriksaan, bukan otomatis memulihkan revision lama.
+
+Setelah ordinary correction, re-import payload predecessor dengan identity yang sama wajib diklasifikasikan terhadap CURRENT successor. Jika content berbeda dari successor, hasilnya `SOURCE_CONTENT_CONFLICT`; jika sama, duplicate/idempotent. Jangan membuat independent CURRENT baru hanya karena predecessor sudah SUPERSEDED: successor tetap menjaga source identity yang sama.
+
+Constraints yang diusulkan pada `performance_evaluations`:
+
+- `source_identity_fingerprint CHAR(64) NOT NULL` memiliki index **non-unique** agar revision history dipertahankan; `content_fingerprint CHAR(64) NOT NULL` wajib pada setiap evaluasi domain valid.
+- Tambahkan nullable `current_source_identity_fingerprint` dengan **unique index**: untuk `CURRENT` nilainya sama dengan `source_identity_fingerprint`; untuk `SUPERSEDED` nilainya `NULL`. Ini menjamin maksimal satu CURRENT evaluation per source identity, termasuk concurrent initial import.
+- Nullable unique `previous_version_id` tetap menjamin satu direct successor per predecessor.
+- `current_source_identity_fingerprint CHAR(64)` nullable dan UNIQUE merupakan lifecycle projection, bukan hash independen. Supersession tidak menghapus historical `source_identity_fingerprint` atau `content_fingerprint`.
+- Provenance row import menyimpan `source_identity_fingerprint` dan `content_fingerprint` secara terpisah dengan index pencarian; tidak menjadikan keduanya pengganti identifier sumber asli.
+
+Jika concurrent initial import terkena unique conflict pada current source identity, service melakukan rollback yang diperlukan, lalu re-query dalam transaksi/read context yang valid dan mengklasifikasikan canonical payload sebagai duplicate atau `SOURCE_CONTENT_CONFLICT`, bukan generic failure. Penanganan ini khusus konflik identity; kegagalan database lain tidak disamarkan sebagai duplicate. Correction tetap eksplisit dan tidak berubah menjadi auto-revision akibat reimport.
+
+### Phase 02A — private storage dan DB atomicity boundary
+
+Private object storage tidak ikut rollback transaksi DB. Service menyimpan upload baru pada object key acak dan unik, memverifikasi checksum, lalu menjalankan transaksi metadata/domain.
+
+Jika object baru berhasil disimpan tetapi transaksi DB gagal:
+
+- Rollback seluruh perubahan DB dalam transaksi tersebut.
+- Compensating cleanup hanya boleh menghapus object baru milik operasi gagal yang dipastikan belum memiliki referensi committed.
+- Jangan menghapus object existing, object reused, atau evidence historis, termasuk workbook batch yang sudah tersimpan sebelumnya.
+- Jika cleanup gagal, pertahankan object sebagai orphan baru untuk retry cleanup terkontrol; periksa ulang referensi sebelum retry. Error harus tersanitasi dan storage path tidak masuk business audit.
+- Jika hasil commit belum dapat dipastikan, rekonsiliasi status DB terlebih dahulu; jangan melakukan cleanup berdasarkan asumsi rollback.
+
+Kegagalan parsing setelah metadata batch/file berhasil committed bukan orphan: workbook dipertahankan sebagai provenance batch gagal. Tidak ada purge evidence historis. Kegagalan transaksi tidak boleh mengubah predecessor atau meninggalkan successor parsial.
+
+### Phase 02A — adapter acceptance dan boundary
+
+Adapter client belum accepted sampai **sanitized representative workbook dengan struktur nyata client** diverifikasi. Verifikasi mencakup sheet/header, struktur record, identitas pegawai, source reference/record identifier, tanggal, predikat, dan coverage. Fixture sintetis saja tidak memenuhi acceptance adapter; mapping workbook tidak boleh ditebak.
+
+UI import/evidence tetap Phase 02D. Source selection dan conversion tetap pada checkpoint berikutnya; kontrak evidence/import 02A tidak memilih sumber per bulan atau menghitung AK. Explicit correction dan seluruh pending business rules tetap dipertahankan.
 
 ### Pemilihan sumber dan periode
 
@@ -275,21 +351,44 @@ Golden Nurmaulida tetap numeric fixture: koefisien 25 berasal dari bukti contoh,
 
 ### Tables dan migrations yang diusulkan
 
-Lima tabel baru, masing-masing melalui migration additive:
+Tujuh tabel baru, masing-masing melalui migration additive. Phase 02A mencakup `performance_evaluations` serta dua supporting tables import; empat tabel rule/conversion tetap pada checkpoint berikutnya:
 
 | Tabel | Isi utama |
 |---|---|
 | `performance_evaluations` | Person, coverage, jenis/sifat sumber, predikat, `previous_version_id`, evidence private, actor/time |
+| `pak_skp_import_batches` | Provenance workbook/operasi import: private storage reference, nama asli, checksum, versi adapter/schema, status, actor/time, summary/error metadata aman |
+| `pak_skp_import_rows` | Occurrence per record: batch, lokasi sumber, person resolution, source identifiers, source/content fingerprint, normalized/raw provenance minimum, status/issues, evaluasi nullable |
 | `performance_predicate_rules` | Rule set, kode/label predikat, faktor decimal |
 | `ak_coefficient_rules` | Rule set, jenjang, koefisien tahunan decimal |
 | `pak_conversion_runs` | Case, revision number, `predecessor_run_id`, rule set, status, input snapshot, issues, fingerprint, total eksak/preview nullable |
 | `pak_conversion_periods` | Run, sumber, histori, range, bulan, rule snapshot, hasil eksak/preview nullable, trace |
+
+Field fingerprint minimum pada proposed schema `performance_evaluations`:
+
+| Field | Kontrak |
+|---|---|
+| `source_identity_fingerprint` | `CHAR(64) NOT NULL`, indexed non-unique |
+| `content_fingerprint` | `CHAR(64) NOT NULL` |
+| `current_source_identity_fingerprint` | `CHAR(64)` nullable, UNIQUE; CURRENT = source identity fingerprint, SUPERSEDED = NULL |
+
+Historical source/content fingerprint tetap tersimpan saat SUPERSEDED. Nullable source/content fingerprint hanya berlaku pada row import yang gagal sebelum fingerprint valid dapat dibentuk, bukan pada domain PerformanceEvaluation.
+
+Persistence import Phase 02A:
+
+- `pak_skp_import_batches`: `id`, `disk`, `object_key` private, `original_filename`, `checksum_sha256`, `adapter_key`, `adapter_version`, `schema_version`, `status`, `created_by`, nullable `committed_by`, `created_at`, `updated_at`, nullable `committed_at`, serta `summary` dan `error_metadata` tersanitasi. Status mencerminkan lifecycle import, bukan approval/finalisasi PAK. Storage reference hanya metadata internal terotorisasi, bukan payload audit.
+- `pak_skp_import_rows`: `id`, `batch_id`, `record_ordinal`, `source_sheet`, `source_row`/`source_locator`, nullable `person_id` ke `people.id`, `person_resolution_status`, nullable `match_method`, `source_reference`, nullable `source_record_identifier`, `source_identity_fingerprint`, `content_fingerprint`, `normalized_payload`, `raw_provenance` minimum, `processing_status`, structured `issue_codes`/error metadata aman, nullable `performance_evaluation_id`, dan timestamps. Field sumber/fingerprint boleh null pada row invalid jika belum dapat dibentuk; evaluasi domain tetap wajib memenuhi validasi sumber resmi.
+- Duplicate, conflict, identity ambiguity, dan validation failure tetap disimpan sebagai row provenance meskipun tidak membuat evaluasi. Duplicate dapat merujuk evaluasi existing; conflict/ambiguity tidak dipaksa memiliki `performance_evaluation_id`.
+- Unique `(batch_id, record_ordinal)`; index `batch_id`, `person_id`, `performance_evaluation_id`, `source_identity_fingerprint`, dan `content_fingerprint`; index batch `(status, created_at)`. Fingerprint row tidak unique karena occurrence lintas import harus dipertahankan.
+- Batch/row provenance disimpan terpisah dari transaksi pembuatan/revision evaluasi. Jika transaksi domain rollback, hasil failure/classification dicatat setelah rollback dalam transaksi provenance tersendiri; tidak meninggalkan evaluasi parsial. Failed batch dan row retained tidak dianggap orphan. Objek baru tanpa referensi committed mengikuti compensating cleanup yang sudah ditetapkan.
+- Raw provenance hanya field yang diperlukan untuk penelusuran, bukan dump seluruh workbook. Jangan menyalin credential, rahasia, raw payload, atau storage path sensitif ke business audit.
+- Urutan migration 02A: `performance_evaluations`, `pak_skp_import_batches`, lalu `pak_skp_import_rows` agar FK tersedia; migrations rule/conversion mengikuti dependensi checkpoint berikutnya. Tidak membuat migration aktual pada documentation checkpoint ini.
 
 Constraint utama:
 
 - FK memakai `RESTRICT`.
 - Unique rule set + predicate code; rule set + functional level.
 - Unique `performance_evaluations.previous_version_id`, nullable.
+- Index non-unique `performance_evaluations.source_identity_fingerprint`; unique nullable `current_source_identity_fingerprint` sesuai lifecycle CURRENT/SUPERSEDED.
 - Unique `pak_conversion_runs.predecessor_run_id`, nullable.
 - Unique case + revision number; run + line number.
 - Status memakai VARCHAR dan enum aplikasi.
@@ -305,6 +404,9 @@ Unique constraints menjadi pengaman database; validasi domain tetap wajib memast
 
 Di `app/Domain/Pak/`:
 
+- `SkpWorkbookAdapter`: membaca struktur workbook client dan menghasilkan normalized SKP source rows beserta raw provenance minimum/lokasi sumber; tidak menentukan source selection conversion dan tidak menghitung AK.
+- `SkpImportService`: mengelola batch/row provenance, person/source identity resolution, canonical serialization melalui serializer terpusat, source/content fingerprint, duplicate/conflict/identity-ambiguity classification, initial-import concurrency, serta storage compensation. Delegasikan create atau explicit revision domain record ke `PerformanceEvaluationService`; import tidak melakukan auto-revision. Source resolution di sini adalah identifikasi record sumber, bukan pemilihan predikat untuk bulan konversi.
+- `SkpFingerprintSerializer`: satu implementasi canonical serialization yang menghasilkan source identity dan content fingerprint dengan kontrak SHA-256 lowercase hexadecimal 64 karakter; mempertahankan seluruh normalization rules di atas. Current fingerprint hanya lifecycle projection yang menyalin source fingerprint atau NULL, bukan output hash independen.
 - `PerformanceEvaluationService`: create, revise, supersede, dan locking correction chain.
 - `PerformanceEvidenceService`: bukti private immutable dan download terotorisasi.
 - `PerformancePeriodResolver`: coverage, segmentasi, bulan utuh, overlap.
@@ -316,7 +418,9 @@ Di `app/Domain/Pak/`:
 - `ConversionReviewService`: issue dependency dan status review.
 - `ConversionRunQuery`: hasil, ownership boundary, latest run, metric review.
 
-Kontrak utama:
+`PerformanceEvaluationService` tetap menjadi pemilik lifecycle/correction evaluasi. Backend import/source foundation, adapter contract, batch/row persistence, identity/idempotency/concurrency, storage/evidence contract, dan automated domain/integration tests termasuk 02A. Filament upload/preview/commit, import history, evidence upload/download, dan presentation/audit UI tetap 02D.
+
+Kontrak utama conversion (bukan preview import yang menyimpan batch/row provenance):
 
 - `preview(...)`: read-only; menghasilkan segment, hasil/diagnostics, issue, dan fingerprint.
 - `savePreview(...)`: authorize, lock case, validasi predecessor/version, resolve ulang, hitung ulang, cocokkan fingerprint, lalu simpan atomik.
@@ -409,7 +513,7 @@ Snapshot kalkulasi tetap berada pada run dengan akses terotorisasi. Payload audi
 
 ### Files terdampak
 
-Berkas baru mencakup lima model/policies, lima migration, DTO/enums, services/queries di atas, resource/pages SKP dan konversi, controller evidence, views, serta test/fixtures.
+Berkas baru mencakup tujuh model dan tujuh migration untuk tujuh tabel di atas, policies sesuai batas akses, DTO/enums, backend adapter/import/serializer serta services/queries di atas, resource/pages SKP dan konversi, controller evidence, views, serta test/fixtures. Resource/pages dan UI import/evidence tetap deliverable 02D; bukan implementasi 02A.
 
 Berkas existing yang direncanakan berubah:
 
@@ -435,13 +539,37 @@ Seluruh checkpoint tetap di branch **`feature/pak-phase-02`**. Checkpoint bukan 
 
 | Checkpoint | Deliverable dan gate |
 |---|---|
-| **02A — SKP/source** | Model sumber, coverage, correction chain, provenance, authorization sumber resmi/retensi historis, kontrak evidence immutable; tests lifecycle |
+| **02A — SKP/source** | Backend import/source foundation, adapter contract, batch/row persistence, coverage, source lifecycle/correction, identity/idempotency/concurrency, authorization, storage/evidence contract; automated domain/integration tests |
 | **02B — Rule + calculator** | Child rules, permanent lock, explicit lookup, exact arithmetic, presentation policy; golden numeric tests |
 | **02C — Run/segmentation** | Full-month resolver, issues, statuses, replacement chain, server-authoritative save, equality rule case/run; integration tests |
-| **02D — UI/evidence/audit** | Filament, private upload/download, audit privacy, comparison, dashboard review; Livewire dan authorization tests |
+| **02D — UI/evidence/audit** | Filament upload/preview/commit UI, import history UI, evidence upload/download UI, presentation/audit UI, comparison, dashboard review; Livewire dan authorization tests |
 | **02E — Regression/MySQL/UAT** | Full suite, upgrade/fresh schema di DB terisolasi, MySQL races, UAT, dokumentasi hasil |
 
 ### Test wajib
+
+**Phase 02A — acceptance/design cases (spesifikasi, bukan executable tests)**
+
+Pada documentation checkpoint ini cases berikut belum executable. Seluruh acceptance/design cases Phase 02A **WAJIB menjadi executable automated tests** ketika checkpoint 02A diimplementasikan, termasuk domain/integration tests dan pengujian concurrency MySQL yang relevan.
+
+- Batch/row persistence mempertahankan duplicate, conflict, identity ambiguity, dan validation failure tanpa mewajibkan evaluasi baru; failed batch/row tetap dapat ditelusuri setelah rollback domain.
+- Source identity dan content fingerprint hanya dibentuk melalui serializer terpusat dengan output SHA-256 lowercase hexadecimal 64 karakter; current fingerprint merupakan salinan source fingerprint atau NULL, tanpa re-hash independen.
+- Valid domain evaluation tidak dapat disimpan tanpa source identity atau content fingerprint.
+- CURRENT selalu memiliki current fingerprint yang sama dengan source identity; SUPERSEDED selalu memiliki current fingerprint NULL, sementara historical source/content fingerprint tetap ada.
+- Ordinary correction dengan source identity yang sama dan canonical content berbeda tetap dapat membuat successor sesuai correction lifecycle; perubahan terhadap masing-masing identity-defining field ditolak setelah predecessor dikunci, tanpa mengubah predecessor atau membuat successor.
+- Ordinary correction mempertahankan source identity dan mengubah content fingerprint hanya ketika canonical content berubah; perubahan kosmetik whitespace tidak menghasilkan fingerprint baru.
+- Ordinary correction dengan identity sama tetapi canonical content sama persis ditolak sebagai `NO_CHANGES`, termasuk bila hanya revision reason yang berubah. Predecessor tetap CURRENT, current fingerprint tetap sama, tidak ada successor atau partial lifecycle mutation, dan tidak ada correction audit seolah-olah data berubah. Perubahan kosmetik whitespace yang menghasilkan canonical content sama juga merupakan no-op.
+- Setelah correction, re-import payload predecessor diklasifikasikan terhadap CURRENT successor sebagai duplicate atau `SOURCE_CONTENT_CONFLICT` sesuai canonical content, bukan membuat independent CURRENT baru.
+- Source identity sama/content sama menghasilkan duplicate; identity sama/content berbeda menghasilkan `SOURCE_CONTENT_CONFLICT`; identity berbeda dapat menjadi evidence independen setelah validasi.
+- Concurrent initial import identik menghasilkan tepat satu CURRENT evaluation; request yang terkena unique conflict melakukan re-query dan menjadi duplicate, bukan generic failure.
+- Concurrent initial import dengan identity sama/content berbeda menghasilkan satu CURRENT dan conflict pada request lainnya; tidak overwrite atau auto-correction.
+- Dua concurrent corrections terhadap predecessor yang sama hanya satu berhasil; nullable unique `previous_version_id` mencegah dua direct successors.
+- Correction atomik mengosongkan current fingerprint predecessor, membuat successor CURRENT beserta predecessor link/current fingerprint, dan menyimpan actor/time/reason/audit. Failure di setiap tahap memulihkan predecessor dan tidak meninggalkan successor parsial.
+- Canonical serialization konsisten untuk fixed fields/order, UTF-8, explicit null, dan tanggal ISO. Leading zero serta kapitalisasi identifier dipertahankan; row order, workbook name, batch ID, dan import order tidak membentuk identifier.
+- Perbedaan surrounding/repeated whitespace pada descriptive text tidak menimbulkan false content conflict; raw/original value tetap dapat ditelusuri sebagai provenance.
+- Object baru berhasil ditulis lalu DB gagal: orphan baru tanpa referensi dibersihkan; object existing/reused dan evidence historis tetap utuh.
+- Cleanup pertama gagal: retry memeriksa ulang referensi dan tidak menghapus object yang telah direferensikan. Hasil commit yang belum pasti direkonsiliasi sebelum cleanup.
+- Workbook batch gagal dengan metadata committed tetap dipertahankan; failure tidak mengubah file lama, evidence lama, atau predecessor.
+- Adapter acceptance menggunakan sanitized representative workbook dengan struktur nyata client yang telah diverifikasi, bukan fixture sintetis saja.
 
 **Calculation dan segmentasi**
 
