@@ -50,6 +50,8 @@ BR-KONV-004 telah APPROVED.
 **Priority:** CRITICAL  
 **Source:** dokumen PAK fisik BBPMP Jatim
 
+**Koreksi client:** dokumen terbaru `PAK KONVERSI Nurmaulida Sitoresmi, S.S..docx` menegaskan AK Dasar 100 dan AK Konversi Baru 75 menghasilkan total kumulatif 175. AK Dasar tidak dicatat kembali sebagai AK Konversi Lama.
+
 **Scope Phase 02:** numeric fixture saja sampai dasar resmi mapping jabatan/jenjang dapat dibuktikan. Jangan membuat mapping JF fiktif untuk mendapatkan koefisien 25. Resolusi produksi tetap menggunakan data terverifikasi. Expected Akumulasi/PAK di bawah hanya untuk Phase berikutnya.
 
 ### Given
@@ -116,12 +118,12 @@ Display line 2023 = 4,167 dan 2026 = 20,833 tidak dipakai untuk penjumlahan tota
 
 ### Expected Akumulasi
 
-Dokumen Akumulasi memiliki AK sebelumnya:
+Dokumen Akumulasi memisahkan AK Dasar dari AK Konversi Baru:
 
 ```text
-AK existing = 100
-AK baru     = 75
-Total       = 175
+AK Dasar         = 100
+AK Konversi Baru = 75
+Jumlah AK        = 175
 ```
 
 ### Expected PAK
@@ -129,10 +131,16 @@ Total       = 175
 Dokumen Penetapan:
 
 ```text
-AK Dasar        = 100
-AK Konversi     = 175
-Total Kumulatif = 275
+AK Dasar yang diberikan — Lama = 100
+AK Konversi — Lama             = tidak ada / 0
+AK Konversi — Baru             = 75
+Jumlah Angka Kredit Kumulatif:
+  Lama                        = 100
+  Baru                        = 75
+  Total                       = 175
 ```
+
+AK Dasar != AK Integrasi/legacy != AK Konversi. Pada golden case ini, angka 100 adalah AK Dasar, bukan AK Konversi Lama atau AK Integrasi. Jangan memasukkannya kembali sebagai komponen konversi; total kumulatif menghitung AK Dasar hanya sekali.
 
 ### Assertions
 
@@ -140,7 +148,9 @@ Total Kumulatif = 275
 - [ ] Tidak ada overlap.
 - [ ] Total conversion baru = 75.
 - [ ] Akumulasi = 175.
-- [ ] PAK kumulatif = 275.
+- [ ] AK Dasar Lama = 100; AK Konversi Lama tidak ada / 0; AK Konversi Baru = 75.
+- [ ] PAK kumulatif: Lama = 100, Baru = 75, Total = 175.
+- [ ] AK Dasar tidak dihitung ulang sebagai AK Konversi Lama atau diklasifikasikan sebagai AK Integrasi/legacy.
 - [ ] Calculation trace tersimpan.
 - [ ] Final snapshot tidak berubah bila master coefficient kemudian diedit.
 

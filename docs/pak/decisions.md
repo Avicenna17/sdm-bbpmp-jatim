@@ -31,6 +31,7 @@ Bagian Phase 01 berikut merupakan histori keputusan saat foundation diterapkan; 
 | Materi resmi/PPT untuk guidance Admin PAK | BR-REF-001 | Pisahkan engine Phase 02, guidance, dan rule phase berikutnya; tabel tidak otomatis calculator aktif |
 | Presisi penuh, total-only ROUND_HALF_UP maksimal 3 desimal, trim trailing zeros | BR-KONV-004 | Rounding tidak lagi pending; PREVIEW_ONLY tetap batas lifecycle, bukan ketidakpastian rounding |
 | Nurmaulida numeric fixture tanpa mapping JF fiktif | TC-PAK-001/037 | Hasil numerik 75 tidak membuktikan resolusi jabatan produksi |
+| Koreksi client golden Nurmaulida berdasarkan dokumen PAK terbaru | TC-PAK-001 | Konversi baru 75; AK Dasar 100; akumulasi dan PAK kumulatif 175. Penetapan: AK Dasar Lama 100, AK Konversi Lama tidak ada/0, AK Konversi Baru 75; kumulatif Lama 100 + Baru 75 = 175. AK Dasar tidak dicatat kembali sebagai AK Konversi Lama dan tetap berbeda dari AK Integrasi/legacy. Akumulasi/penetapan tetap phase berikutnya; scope dan schema SKP/source 02A.1 tidak berubah. |
 
 Default Unit Kerja: **Balai Besar Penjaminan Mutu Pendidikan Provinsi Jawa Timur**. Default Instansi: **Kementerian Pendidikan Dasar dan Menengah**. Requirement personnel: KARPEG/Nomor Seri Karpeg, TEMPAT LAHIR, TGL LAHIR, TMT PANGKAT/GOL, dan TMT JABATAN -> SK. Wajib provenance sumber dan verifikasi; tidak mengasumsikan current DUK sebagai bukti historis tanpa verifikasi.
 
