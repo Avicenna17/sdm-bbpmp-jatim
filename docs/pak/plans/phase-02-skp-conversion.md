@@ -383,6 +383,15 @@ Persistence import Phase 02A:
 - Raw provenance hanya field yang diperlukan untuk penelusuran, bukan dump seluruh workbook. Jangan menyalin credential, rahasia, raw payload, atau storage path sensitif ke business audit.
 - Urutan migration 02A: `performance_evaluations`, `pak_skp_import_batches`, lalu `pak_skp_import_rows` agar FK tersedia; migrations rule/conversion mengikuti dependensi checkpoint berikutnya. Tidak membuat migration aktual pada documentation checkpoint ini.
 
+### Phase 02A.1 — penegasan schema dan model invariants
+
+- `pak_skp_import_batches.disk`: `VARCHAR(50) NOT NULL` **tanpa default**. Pemilihan disk wajib eksplisit oleh service/config pada checkpoint berikutnya; model/schema tidak mengasumsikan `local` atau disk lain.
+- Hash/checksum guard: `pak_skp_import_batches.checksum_sha256` wajib lowercase hexadecimal tepat 64 karakter (`[0-9a-f]{64}`). `pak_skp_import_rows.source_identity_fingerprint` dan `content_fingerprint`, bila non-null, wajib memenuhi format yang sama. Guard ini memvalidasi format, bukan mengimplementasikan hashing/serializer pada 02A.1.
+- Row dengan `processing_status` READY, IMPORTED, DUPLICATE, atau CONFLICT wajib memiliki `person_resolution_status=MATCHED`, `person_id` non-null, serta source identity dan content fingerprint non-null. IMPORTED dan DUPLICATE juga wajib memiliki `performance_evaluation_id`; CONFLICT tidak wajib menghasilkan evaluasi. Retensi row invalid/ambiguity sebelum identity/content dapat dibentuk tetap dipertahankan.
+- Batch berstatus COMMITTED wajib memiliki `committed_by` dan `committed_at`. Pada status non-COMMITTED, kedua field tersebut harus NULL dan tidak boleh mengklaim metadata commit. COMMITTED berarti operasi import telah difinalisasi sesuai kontrak import, bukan seluruh row harus IMPORTED; batch COMMITTED dapat mempertahankan row DUPLICATE, CONFLICT, atau INVALID sebagai provenance. Ini bukan finalisasi bisnis PAK.
+- Normal insert `PerformanceEvaluation` hanya boleh membuat CURRENT. SUPERSEDED hanya terjadi melalui transisi CURRENT → SUPERSEDED sesuai correction lifecycle yang telah ditetapkan; normal model create tidak boleh langsung membuat SUPERSEDED.
+- Direct SQL/bulk query bukan jalur penulisan domain yang sah. Model guards tidak dianggap melindungi operasi yang melewati Eloquent events; `PakModel` global tidak diubah pada 02A.1. Penegasan ini tidak mengimplementasikan service, serializer, atau executable test pada documentation checkpoint.
+
 Constraint utama:
 
 - FK memakai `RESTRICT`.
