@@ -9,7 +9,9 @@ use Spatie\Permission\PermissionRegistrar;
 
 class PakPermissionSeeder extends Seeder
 {
-    public const PERMISSIONS = ['pak.access', 'pak.employee.view', 'pak.employee.manage', 'pak.master.view', 'pak.master.manage', 'pak.rule-set.view', 'pak.rule-set.manage', 'pak.case.view', 'pak.case.create', 'pak.case.update', 'pak.audit.view'];
+    public const PHASE_TWO_PERMISSIONS = ['pak.skp.view', 'pak.skp.manage', 'pak.skp.provisional', 'pak.conversion.view', 'pak.conversion.calculate'];
+
+    public const PERMISSIONS = ['pak.access', 'pak.employee.view', 'pak.employee.manage', 'pak.master.view', 'pak.master.manage', 'pak.rule-set.view', 'pak.rule-set.manage', 'pak.case.view', 'pak.case.create', 'pak.case.update', 'pak.audit.view', ...self::PHASE_TWO_PERMISSIONS];
 
     public function run(): void
     {
@@ -22,8 +24,9 @@ class PakPermissionSeeder extends Seeder
         );
         $role = Role::firstOrCreate(['name' => 'Admin PAK', 'guard_name' => 'web']);
         if ($role->wasRecentlyCreated) {
-            $role->syncPermissions(self::PERMISSIONS);
+            $role->givePermissionTo(self::PERMISSIONS);
         }
+        $role->givePermissionTo(self::PHASE_TWO_PERMISSIONS);
         Role::findOrCreate('Pegawai', 'web');
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }

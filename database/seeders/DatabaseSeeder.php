@@ -20,16 +20,16 @@ class DatabaseSeeder extends Seeder
         foreach ($permissions as $name) {
             Permission::findOrCreate($name, 'web');
         }
-        $this->syncSdm('Super Admin', $permissions);
-        $this->syncSdm('Admin SDM', array_diff($permissions, ['user.manage', 'role.manage', 'period.revise']));
-        $this->syncSdm('Internal Viewer', ['template.view', 'period.view', 'personnel.view', 'position_requirement.view', 'export.personnel', 'export.position_requirement']);
+        $this->ensureSdmPermissions('Super Admin', $permissions);
+        $this->ensureSdmPermissions('Admin SDM', array_diff($permissions, ['user.manage', 'role.manage', 'period.revise']));
+        $this->ensureSdmPermissions('Internal Viewer', ['template.view', 'period.view', 'personnel.view', 'position_requirement.view', 'export.personnel', 'export.position_requirement']);
         $this->call([PakPermissionSeeder::class, FunctionalMasterSeeder::class]);
     }
 
-    private function syncSdm(string $name, array $permissions): void
+    private function ensureSdmPermissions(string $name, array $permissions): void
     {
         $role = Role::findOrCreate($name, 'web');
-        $explicit = $role->permissions()->where('name', 'like', 'pak.%')->pluck('name')->all();
-        $role->syncPermissions(array_merge($permissions, $explicit));
+        // Reseeding must preserve explicit grants, including non-PAK custom permissions.
+        $role->givePermissionTo($permissions);
     }
 }
