@@ -16,8 +16,8 @@ return new class extends Migration
             $t->unsignedBigInteger('subject_id');
             $t->string('event_code', 100);
             $t->json('payload')->nullable();
-            $t->timestamp('occurred_at');
-            $t->timestamp('created_at');
+            $t->timestamp('occurred_at')->useCurrent();
+            $t->timestamp('created_at')->useCurrent();
             $t->index(['pak_case_id', 'occurred_at']);
             $t->index(['subject_type', 'subject_id', 'occurred_at'], 'pak_event_subject_time');
         });
