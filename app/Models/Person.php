@@ -36,6 +36,11 @@ class Person extends Model
         return $this->hasMany(PakCase::class);
     }
 
+    public function performanceEvaluations()
+    {
+        return $this->hasMany(PerformanceEvaluation::class);
+    }
+
     public function snapshots()
     {
         return $this->hasMany(PersonnelSnapshot::class);

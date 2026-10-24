@@ -37,6 +37,11 @@ class FoundationSchemaTest extends TestCase
     {
         $paths = glob(database_path('migrations/2026_10_17_*.php'));
         sort($paths);
+        $sourcePaths = glob(database_path('migrations/2026_10_23_*.php'));
+        sort($sourcePaths);
+        foreach (array_reverse($sourcePaths) as $path) {
+            (require $path)->down();
+        }
         foreach (array_reverse($paths) as $path) {
             (require $path)->down();
         }
@@ -45,6 +50,9 @@ class FoundationSchemaTest extends TestCase
         $personId = $db::table('people')->insertGetId(['person_key' => hash('sha256', 'legacy'), 'canonical_name' => 'Legacy Person', 'normalized_name' => 'LEGACY PERSON']);
         $periodId = $db::table('reporting_periods')->insertGetId(['period_month' => '2025-01-01', 'status' => 'published', 'revision' => 1]);
         foreach ($paths as $path) {
+            (require $path)->up();
+        }
+        foreach ($sourcePaths as $path) {
             (require $path)->up();
         }
         $user = User::findOrFail($userId);
