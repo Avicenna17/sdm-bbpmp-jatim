@@ -5,6 +5,8 @@ namespace App\Domain\Pak\Services;
 use App\Domain\Pak\Authorization\PakEmployeeAuthorization as Access;
 use App\Models\PakRuleSet;
 use App\Models\User;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -12,6 +14,49 @@ use Illuminate\Validation\ValidationException;
 
 final class PakRuleSetService
 {
+    public function copyVersion(User $actor, int $sourceRuleSetId, string $newVersion): PakRuleSet
+    {
+        Access::authorize($actor, 'pak.rule-set.manage');
+        Access::authorize($actor, 'pak.rule-set.view');
+        Validator::make(['version' => $newVersion], ['version' => 'required|string|max:50'])->validate();
+
+        try {
+            return DB::transaction(function () use ($actor, $sourceRuleSetId, $newVersion) {
+                $source = PakRuleSet::lockForUpdate()->find($sourceRuleSetId);
+                if (! $source) {
+                    throw ValidationException::withMessages(['rule' => 'RULE_SET_NOT_FOUND']);
+                }
+                if ($source->status !== 'DRAFT') {
+                    throw ValidationException::withMessages(['rule' => 'RULE_SET_NOT_EDITABLE']);
+                }
+                $predicates = $source->performancePredicateRules()->orderBy('id')->sharedLock()->get();
+                $coefficients = $source->akCoefficientRules()->orderBy('id')->sharedLock()->get();
+                try {
+                    $target = PakRuleSet::create($source->only(['code', 'name', 'valid_from', 'valid_until', 'reference']) + [
+                        'version' => $newVersion, 'status' => 'DRAFT', 'created_by' => $actor->id, 'updated_by' => $actor->id,
+                    ]);
+                } catch (UniqueConstraintViolationException $error) {
+                    throw ValidationException::withMessages(['version' => 'RULE_VERSION_CONFLICT']);
+                }
+                foreach ($predicates as $child) {
+                    $target->performancePredicateRules()->create($child->only(['predicate_code', 'predicate_name', 'predicate_factor']));
+                }
+                foreach ($coefficients as $child) {
+                    $target->akCoefficientRules()->create($child->only(['functional_level_id', 'annual_coefficient']));
+                }
+                app(PakAuditService::class)->record($actor, $target, 'RULE_SET_COPIED', ['after' => [
+                    'source_rule_set_id' => $source->id, 'target_rule_set_id' => $target->id,
+                    'code' => $target->code, 'version' => $target->version, 'status' => $target->status,
+                    'predicate_count' => $predicates->count(), 'coefficient_count' => $coefficients->count(),
+                ]]);
+
+                return $target;
+            });
+        } catch (QueryException $error) {
+            throw ValidationException::withMessages(['persistence' => 'PERSISTENCE_FAILED']);
+        }
+    }
+
     public function save(User $actor, array $input, ?int $id = null): PakRuleSet
     {
         Access::authorize($actor, 'pak.rule-set.manage');
