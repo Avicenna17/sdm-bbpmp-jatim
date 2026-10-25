@@ -19,7 +19,7 @@ use App\Models\Person;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -33,7 +33,7 @@ use Tests\TestCase;
 
 class PerformanceEvaluationServiceTest extends TestCase
 {
-    use RefreshDatabase, SkpSourceFixtures;
+    use SkpSourceFixtures;
 
     private User $actor;
 
@@ -46,6 +46,11 @@ class PerformanceEvaluationServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        if (DB::connection()->getDatabaseName() !== ':memory:') {
+            throw new RuntimeException('Service tests require isolated in-memory SQLite.');
+        }
+        $this->artisan('migrate:fresh', ['--force' => true])->assertSuccessful();
+        RefreshDatabaseState::$migrated = false;
         $this->actor = $this->authorizedActor();
         $this->person = Person::factory()->create(['nip' => '001234567890123456']);
         $this->service = app(PerformanceEvaluationService::class);
@@ -400,23 +405,147 @@ class PerformanceEvaluationServiceTest extends TestCase
         $this->assertSame('READY', $row->fresh()->processing_status->value);
     }
 
-    public function test_correction_remains_composable_with_outer_transaction_rollback(): void
+    public function test_correction_rejects_outer_transaction_before_mutation(): void
     {
         $old = $this->service->createInitial($this->actor, $this->record())->fresh();
         $before = $old->getAttributes();
         $proposed = $this->record(['predicate_code' => 'CUKUP']);
         $row = $this->evidence($proposed);
-        try {
-            DB::transaction(function () use ($old, $proposed, $row) {
-                $this->service->correct($this->actor, $old->id, $proposed, 'Correction', $row->id);
-                $this->assertDatabaseCount('performance_evaluations', 2);
-                $this->assertDatabaseCount('pak_events', 1);
-                throw new RuntimeException('synthetic outer rollback');
+        $sourceBefore = $row->fresh()->getAttributes();
+        $batchBefore = $row->batch->getAttributes();
+        $nested = 0;
+        DB::transaction(function () use ($old, $proposed, $row, $before, &$nested) {
+            DB::connection()->beforeStartingTransaction(function () use (&$nested) {
+                $nested++;
             });
-        } catch (RuntimeException $error) {
-            $this->assertSame('synthetic outer rollback', $error->getMessage());
-        }
+            $this->assertSame(1, DB::transactionLevel());
+            $this->rejected(fn () => $this->service->correct($this->actor, $old->id, $proposed, 'Correction', $row->id), 'CORRECTION_REQUIRES_TOP_LEVEL_TRANSACTION');
+            $this->unchanged($old, $before);
+            $this->assertSame(1, DB::transactionLevel());
+        });
+        $this->assertSame(0, $nested);
+        $this->assertSame($sourceBefore, $row->fresh()->getAttributes());
+        $this->assertSame($batchBefore, $row->batch->fresh()->getAttributes());
         $this->unchanged($old, $before);
+    }
+
+    private function driverError(string $state = '40001', int $vendor = 1213): QueryException
+    {
+        $previous = new \PDOException('Synthetic driver failure', (int) $state);
+        $previous->errorInfo = [$state, $vendor, $vendor === 1062 ? "Duplicate entry 'synthetic' for key 'pe_current_source_uq'" : 'Synthetic driver failure'];
+
+        return new QueryException('testing', 'synthetic query', [], $previous);
+    }
+
+    public static function deadlockCounts(): array
+    {
+        return [[1], [3]];
+    }
+
+    #[DataProvider('deadlockCounts')]
+    public function test_deadlock_retries_rollback_full_attempt_and_are_bounded(int $failures): void
+    {
+        $old = $this->service->createInitial($this->actor, $this->record())->fresh();
+        $before = $old->getAttributes();
+        $proposed = $this->record(['predicate_code' => 'CUKUP']);
+        $row = $this->evidence($proposed);
+        $attempts = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts, $old, $before) {
+            $this->assertSame(0, DB::transactionLevel());
+            $this->unchanged($old, $before);
+            $attempts++;
+        });
+        $calls = 0;
+        // Fail after successor and audit insertion, proving the entire attempt rolls back.
+        PakEvent::created(function () use (&$calls, $failures) {
+            if (++$calls <= $failures) {
+                throw $this->driverError();
+            }
+        });
+        if ($failures === 3) {
+            $this->rejected(fn () => $this->service->correct($this->actor, $old->id, $proposed, 'Correction', $row->id), 'CONCURRENCY_RETRY_EXHAUSTED');
+            $this->unchanged($old, $before);
+            $this->assertSame(3, $attempts);
+        } else {
+            $next = $this->service->correct($this->actor, $old->id, $proposed, 'Correction', $row->id);
+            $this->assertSame(2, $attempts);
+            $this->assertSame($old->id, $next->previous_version_id);
+            $this->assertSame('SUPERSEDED', $old->fresh()->status->value);
+            $this->assertSame('CURRENT', $next->status->value);
+            $this->assertSame(1, PerformanceEvaluation::where('previous_version_id', $old->id)->count());
+            $this->assertDatabaseCount('pak_events', 1);
+        }
+        $this->assertSame(0, DB::transactionLevel());
+    }
+
+    public function test_retry_keeps_original_predecessor_after_competing_correction(): void
+    {
+        $old = $this->service->createInitial($this->actor, $this->record());
+        $proposed = $this->record(['predicate_code' => 'CUKUP']);
+        $row = $this->evidence($proposed);
+        $fail = true;
+        $compete = false;
+        $successor = null;
+        PakEvent::created(function () use (&$fail, &$compete) {
+            if ($fail) {
+                $fail = false;
+                $compete = true;
+                throw $this->driverError();
+            }
+        });
+        DB::connection()->beforeStartingTransaction(function () use (&$compete, &$successor, $old, $proposed, $row) {
+            if ($compete) {
+                $compete = false;
+                $this->assertSame(0, DB::transactionLevel());
+                $successor = $this->service->correct($this->actor, $old->id, $proposed, 'Competing correction', $row->id);
+            }
+        });
+        $this->rejected(fn () => $this->service->correct($this->actor, $old->id, $proposed, 'Original request', $row->id), 'PREDECESSOR_NOT_CURRENT');
+        $this->assertSame($old->id, $successor->previous_version_id);
+        $this->assertSame('CURRENT', $successor->fresh()->status->value);
+        $this->assertDatabaseCount('performance_evaluations', 2);
+        $this->assertDatabaseCount('pak_events', 1);
+    }
+
+    public static function nonRetryableErrors(): array
+    {
+        return [['23000', 1452], ['23000', 1062], ['HY000', 1205], ['HY000', 2006], ['42000', 1064]];
+    }
+
+    #[DataProvider('nonRetryableErrors')]
+    public function test_correction_does_not_retry_other_database_errors(string $state, int $vendor): void
+    {
+        $old = $this->service->createInitial($this->actor, $this->record())->fresh();
+        $before = $old->getAttributes();
+        $proposed = $this->record(['predicate_code' => 'CUKUP']);
+        $row = $this->evidence($proposed);
+        $error = $this->driverError($state, $vendor);
+        $attempts = 0;
+        PakEvent::created(function () use ($error, &$attempts) {
+            $attempts++;
+            throw $error;
+        });
+        try {
+            $this->service->correct($this->actor, $old->id, $proposed, 'Correction', $row->id);
+            $this->fail('Expected original database error');
+        } catch (QueryException $actual) {
+            $this->assertSame($error, $actual);
+        }
+        $this->assertSame(1, $attempts);
+        $this->unchanged($old, $before);
+    }
+
+    public function test_no_changes_is_not_retried(): void
+    {
+        $record = $this->record();
+        $old = $this->service->createInitial($this->actor, $record);
+        $attempts = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts) {
+            $attempts++;
+        });
+        $this->rejected(fn () => $this->service->correct($this->actor, $old->id, $record, 'Reason alone', 9999), 'NO_CHANGES');
+        $this->assertSame(1, $attempts);
+        $this->assertDatabaseCount('pak_events', 0);
     }
 
     public static function failurePoints(): array

@@ -76,6 +76,28 @@ final class SkpSourceStorage
         }
     }
 
+    /** Verify retained exact bytes without mutation; caller keeps this outside transaction retries. */
+    public function verify(SkpStoredSource $source): void
+    {
+        $this->validateKey($source);
+        $stream = null;
+        try {
+            $stream = $this->privateDisk($source->disk)->readStream($source->object_key);
+            if (! is_resource($stream)) {
+                throw new SkpSourceStorageException('SOURCE_STORAGE_READ_FAILED', $source);
+            }
+            if (! hash_equals($source->checksum_sha256, $this->checksum($stream))) {
+                throw new SkpSourceStorageException('SOURCE_CHECKSUM_MISMATCH', $source);
+            }
+        } catch (Throwable $error) {
+            throw new SkpSourceStorageException($error instanceof SkpSourceStorageException ? $error->issue_code : 'SOURCE_STORAGE_READ_FAILED', $source);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+    }
+
     public function exists(SkpStoredSource $source): bool
     {
         $this->validateKey($source);

@@ -69,8 +69,15 @@ class PakSkpImportRow extends PakModel
             if (in_array($row->processing_status, [SkpImportRowStatus::IMPORTED, SkpImportRowStatus::DUPLICATE], true) && $row->performance_evaluation_id === null) {
                 throw ValidationException::withMessages(['performance_evaluation_id' => 'Evaluation wajib untuk IMPORTED/DUPLICATE.']);
             }
-            if ($row->performance_evaluation_id !== null && ! $row->performanceEvaluation()->where('person_id', $row->person_id)->exists()) {
-                throw ValidationException::withMessages(['performance_evaluation_id' => 'Evaluation harus milik person yang sama.']);
+            if ($row->performance_evaluation_id !== null) {
+                $evaluation = $row->performanceEvaluation()->where('person_id', $row->person_id);
+                if ($row->getConnection()->transactionLevel() > 0) {
+                    // Current read: a locking CURRENT lookup can see beyond an older REPEATABLE-READ snapshot.
+                    $evaluation->sharedLock();
+                }
+                if ($evaluation->first(['id']) === null) {
+                    throw ValidationException::withMessages(['performance_evaluation_id' => 'Evaluation harus milik person yang sama.']);
+                }
             }
         });
     }

@@ -16,12 +16,13 @@ use App\Models\PerformanceEvaluation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 use TypeError;
 use ValueError;
 
 final class PerformanceEvaluationService
 {
-    public function __construct(private SkpFingerprintSerializer $serializer, private PakAuditService $audit, private SkpActiveSourceValidator $active) {}
+    public function __construct(private SkpFingerprintSerializer $serializer, private PakAuditService $audit, private SkpActiveSourceValidator $active, private SkpCommitRetryPolicy $retry) {}
 
     /** Same connection/nested Laravel transaction: the future caller owns the outer batch commit. */
     public function createInitial(User $actor, NormalizedSkpRecord $record, ?int $historyId = null): PerformanceEvaluation
@@ -44,10 +45,30 @@ final class PerformanceEvaluationService
     public function correct(User $actor, int $predecessorId, NormalizedSkpRecord $proposed, string $revisionReason, int $sourceRowId, ?int $historyId = null): PerformanceEvaluation
     {
         PakEmployeeAuthorization::authorize($actor, 'pak.skp.manage');
+        if (DB::transactionLevel() !== 0) {
+            $this->reject('CORRECTION_REQUIRES_TOP_LEVEL_TRANSACTION');
+        }
         if (! mb_check_encoding($revisionReason, 'UTF-8') || ! preg_match('/[^\p{Z}\s]/u', $revisionReason)) {
             throw ValidationException::withMessages(['revision_reason' => 'REVISION_REASON_REQUIRED']);
         }
 
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                return $this->correctAttempt($actor, $predecessorId, $proposed, $revisionReason, $sourceRowId, $historyId);
+            } catch (Throwable $error) {
+                if (! $this->retry->allowsDeadlock($error)) {
+                    throw $error;
+                }
+                if ($attempt === 3) {
+                    $this->reject('CONCURRENCY_RETRY_EXHAUSTED');
+                }
+            }
+        }
+    }
+
+    private function correctAttempt(User $actor, int $predecessorId, NormalizedSkpRecord $proposed, string $revisionReason, int $sourceRowId, ?int $historyId): PerformanceEvaluation
+    {
+        // Each attempt reloads the original target and provenance in a fresh top-level transaction.
         return DB::transaction(function () use ($actor, $predecessorId, $proposed, $revisionReason, $sourceRowId, $historyId) {
             $previous = PerformanceEvaluation::query()->lockForUpdate()->findOrFail($predecessorId);
             if ($previous->status !== PerformanceEvaluationStatus::CURRENT) {
