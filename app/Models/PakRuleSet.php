@@ -18,6 +18,16 @@ class PakRuleSet extends PakModel
         return $this->hasMany(PakCase::class);
     }
 
+    public function performancePredicateRules()
+    {
+        return $this->hasMany(PerformancePredicateRule::class);
+    }
+
+    public function akCoefficientRules()
+    {
+        return $this->hasMany(AkCoefficientRule::class);
+    }
+
     protected static function booted(): void
     {
         parent::booted();

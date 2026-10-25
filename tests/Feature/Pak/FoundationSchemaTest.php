@@ -39,6 +39,13 @@ class FoundationSchemaTest extends TestCase
         sort($paths);
         $sourcePaths = glob(database_path('migrations/2026_10_23_*.php'));
         sort($sourcePaths);
+        $rulePaths = [
+            database_path('migrations/2026_10_25_000100_create_performance_predicate_rules.php'),
+            database_path('migrations/2026_10_25_000200_create_ak_coefficient_rules.php'),
+        ];
+        foreach (array_reverse($rulePaths) as $path) {
+            (require $path)->down();
+        }
         foreach (array_reverse($sourcePaths) as $path) {
             (require $path)->down();
         }
@@ -53,6 +60,9 @@ class FoundationSchemaTest extends TestCase
             (require $path)->up();
         }
         foreach ($sourcePaths as $path) {
+            (require $path)->up();
+        }
+        foreach ($rulePaths as $path) {
             (require $path)->up();
         }
         $user = User::findOrFail($userId);
