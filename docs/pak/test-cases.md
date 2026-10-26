@@ -863,6 +863,8 @@ Semua kasus berikut adalah spesifikasi dokumenter. Angka koefisien/faktor sintet
 
 ## TC-PAK-033 — Jenjang Per Bulan dan Beberapa Perubahan Dalam Sebulan
 
+**Prasyarat OD-04:** histories fixture verified/non-superseded dan interval inclusive-nya contiguous tanpa gap/overlap untuk seluruh requested months. Setiap predecessor ditutup sehari sebelum successor mulai; latest-TMT whole-month selection dilakukan setelah continuity/integrity terbukti (TC-PAK-040).
+
 **Rule:** BR-JAB-001. Given request Jan–Okt, jenjang lama koefisien fixture 12.5 berlaku Jan–Sep, jenjang baru koefisien 25 TMT 15 Oktober; predikat terpilih Baik. Expected raw = (9/12 × 12.5) + (1/12 × 25) = 275/24; total output 11,458. Seluruh Oktober memakai 25, bukan prorata hari; Januari–September tidak memakai 25 secara retroaktif.
 
 Ulangi TMT baru 1 Oktober dan 31 Oktober: hasil sama. Tambahkan perubahan lain koefisien fixture 37.5 pada TMT 25 Oktober setelah TMT 15 Oktober: seluruh Oktober memakai 37.5; raw total = (9/12 × 12.5) + (1/12 × 37.5) = 12.5, display 12,5. Record dengan ID/urutan Excel/import paling akhir tetapi TMT lebih awal tidak menang. TMT asli dan SK tidak diubah. Tidak menghasilkan PARTIAL_MONTH_REQUIRES_REVIEW hanya karena TMT; requested range parsial mengikuti OD-03 RESOLVED dan TC-PAK-039.
@@ -915,6 +917,36 @@ UAT Phase 02 wajib mencakup TC-PAK-029–038 dan TC-PAK-006. Kasus lintas fase d
 - [ ] TMT posisi tengah/akhir bulan sendiri tidak memicu partial-range issue; formal source coverage yang berbeda dari applied months juga tidak memicunya.
 - [ ] Coverage resolution read-only: tidak mengubah PakCase, evaluation, history, atau menulis audit. Perubahan request/case harus eksplisit melalui lifecycle yang sesuai.
 - [ ] OD-04 history end/gap dan BR-PERIOD-003 rolling window tidak diasumsikan selesai oleh test ini.
+
+## TC-PAK-040 — Position history continuity-first dan whole-month selection
+
+**Contract:** OD-04 RESOLVED pada [Phase 02C plan](plans/phase-02c-resolution-conversion-runs.md#od-04--resolved-history-endgap-dalam-bulan), klarifikasi BR-JAB-001 APPROVED. Planned acceptance 02C.3; bukan executable test atau klaim implementasi. Histories berikut milik canonical person yang sama, verified/non-superseded kecuali dinyatakan lain. Start/end inclusive; null end open-ended. Requested range sendiri full-month sesuai OD-03.
+
+| Fixture / scenario | Expected |
+|---|---|
+| Satu verified open-ended history mulai sebelum/pada awal bulan | Seluruh bulan assigned ke history tersebut |
+| A end `2026-10-14`; B start `2026-10-15`, coverage sampai akhir bulan | Contiguous; B untuk seluruh Oktober |
+| Beberapa TMT contiguous dalam Oktober, masing-masing predecessor end sehari sebelum successor | Latest applicable TMT untuk seluruh Oktober; tanpa prorata/split coefficient |
+| TMT B tanggal 1, 15, atau 31 Oktober, dengan coverage penuh contiguous | B untuk seluruh Oktober pada ketiga fixture |
+| A end `2026-09-30`, tanpa successor Oktober | MISSING_POSITION_HISTORY; full-month gap 1–31 Oktober |
+| A end `2026-10-10`, tanpa successor | MISSING_POSITION_HISTORY; gap 11–31 Oktober (contoh B) |
+| A end `2026-10-10`; B start `2026-10-20` | MISSING_POSITION_HISTORY; gap 11–19 Oktober (contoh A) |
+| A end `2026-09-30`; B start `2026-10-15` | MISSING_POSITION_HISTORY; gap 1–14 Oktober (contoh C) |
+| Successor mulai sehari setelah inclusive end | Contiguous jika remainder coverage bulan juga penuh |
+| Successor mulai pada tanggal inclusive end yang sama | AMBIGUOUS_POSITION_HISTORY; overlap satu hari |
+| A end `2026-10-20`; B start `2026-10-15` | AMBIGUOUS_POSITION_HISTORY; overlap 15–20 Oktober (contoh D) |
+| A open-ended; B mulai kemudian tanpa closure A | AMBIGUOUS_POSITION_HISTORY untuk overlap; A tidak dipotong implicit |
+| Dua authoritative histories dengan equal TMT conflicting | AMBIGUOUS_POSITION_HISTORY; tanpa arbitrary winner |
+| History superseded atau unverified | Diabaikan; tidak menutup gap; jika tidak ada eligible coverage, MISSING_POSITION_HISTORY |
+| Tidak ada eligible history | MISSING_POSITION_HISTORY; tanpa zero/synthetic assignment |
+| History baru mulai November, Oktober tidak covered | MISSING_POSITION_HISTORY untuk Oktober; November tidak diterapkan mundur |
+
+- [ ] Gap awal/tengah/akhir bulan dan overlap tidak menghasilkan authoritative monthly assignment untuk bulan terdampak.
+- [ ] Tidak memperpanjang ended history, membuat synthetic history, menutup gap retroaktif, atau mengisi position/predicate/value zero.
+- [ ] Gap issue membawa affected month/uncovered interval dan safe reference; overlap issue membawa affected month/conflicting interval/history IDs bila tersedia.
+- [ ] Reverse insertion/query order tidak mengubah outcome; tidak memakai ID, created_at, import order, atau arrival order sebagai tie-break.
+- [ ] Documentary gap memakai MISSING_POSITION_HISTORY, bukan PARTIAL_MONTH_REQUIRES_REVIEW atau SOURCE_POSITION_LINK_REQUIRES_REVIEW. TMT tengah/akhir bulan sendiri tidak memicu partial requested-range issue.
+- [ ] Resolution read-only/deterministic: original TMT/end/provenance tidak berubah; tidak menulis history, evaluation, PakCase, audit, atau conversion run.
 
 ## Klarifikasi teknis Foundation
 

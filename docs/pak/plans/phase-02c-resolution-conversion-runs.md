@@ -276,7 +276,7 @@ Baca histori canonical `people.id` yang:
 - applicable;
 - memiliki provenance TMT/SK yang dipertahankan.
 
-Pilih TMT terbesar yang applicable pada setiap bulan. Perubahan awal/tengah/akhir bulan memakai posisi terbaru untuk seluruh bulan perubahan.
+Setelah continuity dan no-overlap untuk seluruh bulan terbukti sesuai OD-04, pilih TMT terbesar yang applicable pada setiap bulan. Perubahan awal/tengah/akhir bulan memakai posisi terbaru untuk seluruh bulan perubahan; latest TMT tidak menutup documentary gap atau menyelesaikan overlap.
 
 Tidak:
 
@@ -301,9 +301,34 @@ Inactive master tetap historical-resolvable. Suitability dipisahkan dari histori
 
 BR-REGIME-001 tetap berlaku. LEGACY/AK Integrasi tidak dihitung atau ditambahkan oleh conversion engine. Kebutuhan mekanisme lain menghasilkan review.
 
-### OD-04 — Gate sebelum 02C.3
+### OD-04 — RESOLVED: History end/gap dalam bulan
 
-Applicability history end/gap di dalam bulan harus diputuskan. Equal-TMT conflict tetap ambiguity, bukan ID tie-break.
+Authoritative position resolution memakai histories milik canonical `people.id` yang verified dan non-superseded. `tmt_start` adalah inclusive start; `tmt_end` adalah inclusive end; `tmt_end = null` berarti open-ended.
+
+Untuk setiap requested calendar month, coverage authoritative wajib terbukti dari hari pertama sampai hari terakhir, tanpa documentary gap atau overlapping authoritative histories. Transisi contiguous hanya jika successor mulai tepat sehari setelah inclusive end predecessor. Successor yang mulai pada tanggal end predecessor adalah overlap. Open-ended predecessor tidak dipotong implicit hanya karena history lain muncul.
+
+Setelah continuity dan no-overlap terbukti, pilih history dengan `tmt_start` terbesar yang applicable dalam bulan. TMT tanggal 1, tengah, atau akhir bulan berlaku untuk seluruh bulan sesuai BR-JAB-001. Tidak ada day proration atau coefficient split dalam satu bulan.
+
+Gap di awal, tengah, atau akhir bulan menghasilkan review, tanpa authoritative monthly assignment untuk bulan terdampak. Jangan memperpanjang history ended, menerapkan successor retroaktif untuk menutup gap, membuat synthetic history, atau mengisi position/predicate/value zero. Mid-month end tanpa contiguous successor dan history ended sebelum bulan tanpa eligible successor juga menghasilkan review.
+
+Overlap authoritative histories dan equal-TMT conflict menghasilkan integrity/review issue. Jangan menyelesaikannya dengan latest TMT saja, database ID, created_at, import order, atau arrival order. Superseded/unverified histories diabaikan dan tidak dapat digunakan untuk menutup gap.
+
+Structured issues menggunakan kode Phase 02C existing:
+
+- `MISSING_POSITION_HISTORY`: tidak ada eligible history atau terdapat documentary gap; dapat membawa affected month, uncovered date interval, dan safe provenance/reference.
+- `AMBIGUOUS_POSITION_HISTORY`: authoritative overlap atau equal-TMT conflict; dapat membawa affected month, conflicting interval/history IDs, dan safe provenance/reference.
+
+Jangan memakai `PARTIAL_MONTH_REQUIRES_REVIEW` (requested-range boundary OD-03) atau `SOURCE_POSITION_LINK_REQUIRES_REVIEW` (evaluation-history proof) untuk masalah continuity ini.
+
+| Histories untuk Oktober 2026 | Outcome |
+|---|---|
+| A end `2026-10-10`; B start `2026-10-20` | REVIEW: gap 11–19 Oktober |
+| A end `2026-10-10`; tanpa successor | REVIEW: gap 11–31 Oktober |
+| A end `2026-09-30`; B start `2026-10-15` | REVIEW: gap 1–14 Oktober |
+| A end `2026-10-20`; B start `2026-10-15` | REVIEW: overlap 15–20 Oktober |
+| A end `2026-10-14`; B start `2026-10-15` | Contiguous; B menang untuk seluruh Oktober jika sisa coverage bulan authoritative |
+
+**Implementation gate 02C.3:** OD-04 RESOLVED; terapkan continuity-first dan hasilkan position assignment/provenance atau structured issues. Resolution tetap read-only/deterministic; keputusan ini tidak mengimplikasikan perubahan source/schema. Planned acceptance mengacu TC-PAK-040, tanpa mengubah OD-03 atau keputusan lain.
 
 ## 9. 02C.4 — Conversion Run Schema + Persistence
 
@@ -661,7 +686,7 @@ Independent processes/connections, bounded timeouts, and fresh final assertions 
 |---|---|
 | **02C.1** | OD-01/02 dan active eligibility diterapkan; DTO/tests lulus |
 | **02C.2** | OD-03 RESOLVED; implementasi mengikuti full-month-only contract dan TC-PAK-039; coverage dan requested-range guards lulus |
-| **02C.3** | OD-04 selesai; position/proof integration lulus |
+| **02C.3** | OD-04 RESOLVED; continuity-first menghasilkan assignment/provenance atau structured issues; position/proof integration dan TC-PAK-040 lulus; tidak mengimplikasikan perubahan source/schema |
 | **02C.4** | DTO final; OD-09 schema dan bagian audit OD-10 disepakati |
 | **02C.5** | OD-10/11 selesai; OD-08 API behavior ditetapkan; 02C.5.1 lengkap sebelum acceptance 02C.5.2 |
 | **02C.6** | Replacement/replay final; required MariaDB races dan relevant 02A regression lulus |
@@ -691,7 +716,7 @@ Tidak ada slice ketujuh. 02C.5.1/02C.5.2 hanya decomposition delivery internal.
 | OD-01 Quarterly relevance | **RESOLVED** | Quarter-start ≤ requested end month; annual priority |
 | OD-02 Evaluation–history proof | **RESOLVED** | Single annual tanpa FK prerequisite; explicit link lalu exact reconstruction |
 | OD-03 Partial requested range | **RESOLVED** | Full-month-only; partial boundary menghasilkan PARTIAL_MONTH_REQUIRES_REVIEW tanpa complete counted-month list/count; wajib diikuti 02C.2 |
-| OD-04 History end/gap dalam bulan | **OPEN DECISION** | Selesai sebelum 02C.3 |
+| OD-04 History end/gap dalam bulan | **RESOLVED** | Inclusive interval; continuity/no-overlap seluruh bulan sebelum latest-TMT whole-month selection; gate 02C.3 mengikuti contract di atas |
 | OD-05 Person coordination | **RESOLVED technical contract** | Complete protocol sebelum acceptance 02C.5; real proof 02C.6 |
 | OD-06 Stale/review | **RESOLVED direction** | Read-only assessment + explicit authorized mutation |
 | OD-07 Annual-late replacement | **BUSINESS PENDING** | BR-SKP-008 tetap; no auto replacement |
