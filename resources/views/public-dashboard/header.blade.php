@@ -4,21 +4,13 @@
 
                 <!-- Logo & Brand Title -->
                 <div class="flex items-center gap-3.5">
-                    <div class="flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-blue-900 via-blue-800 to-sky-600 p-0.5 shadow-md shadow-blue-900/10 flex items-center justify-center">
+                    <div class="flex-shrink-0 w-13 h-13 rounded-xl bg-gradient-to-br from-blue-900 via-blue-800 to-sky-600 p-0.5 shadow-md shadow-blue-900/10 flex items-center justify-center">
                         <div class="w-full h-full bg-blue-950 rounded-[10px] flex items-center justify-center">
                             <!-- Kemendikdasmen / BBPMP Emblem Icon -->
-                            <svg class="w-6 h-6 text-amber-400" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 2L1 7l11 5 9-4.09V17h2V7L12 2z"/>
-                                <path d="M4.5 10.5v5.88c0 3.12 3.36 5.62 7.5 5.62s7.5-2.5 7.5-5.62v-5.88l-7.5 3.41-7.5-3.41z" opacity="0.85"/>
-                            </svg>
+                            <img src="{{ asset('images/bbpmp.png') }}" alt="Logo BBPMP Jatim" class="h-12 sm:h-14 w-auto object-contain" />
                         </div>
                     </div>
                     <div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs font-extrabold tracking-wider text-blue-900 uppercase">KEMENDIKDASMEN</span>
-                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                            <span class="text-xs font-semibold text-slate-500">Jawa Timur</span>
-                        </div>
                         <h1 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">
                             PORTAL DATA KEPEGAWAIAN BBPMP
                         </h1>

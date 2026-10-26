@@ -73,11 +73,47 @@
                 @include('public-dashboard.chart',['title'=>$label,'values'=>$peta['projections'][$metric]??[],'type'=>'bar','horizontal'=>false,'chartId'=>'projection-'.$metric])
             @endforeach
         </div>
-        <div class="portal-card !p-0 overflow-hidden">
-            <div class="p-5 bg-slate-100/70 flex flex-wrap justify-between gap-2"><h3 class="font-bold text-slate-900">Kebutuhan dan ketersediaan pegawai</h3><span class="text-sm text-slate-500">{{ count($peta['top']) }} formasi jabatan</span></div>
-            <div class="overflow-auto max-h-[640px]" tabindex="0" role="region" aria-label="Tabel rekap jabatan"><table class="portal-table"><thead><tr><th>No</th><th>Nama / formasi jabatan</th><th>Jenis</th><th>Kelas</th><th>Pemangku</th><th>Kebutuhan</th><th>Kosong</th><th>Selisih pemangku − kebutuhan</th></tr></thead><tbody>
-                @forelse($peta['top'] as $row)<tr><td>{{ $loop->iteration }}</td><th scope="row">{{ $row['position_name'] }}</th><td>{{ $row['position_type']?:'-' }}</td><td>{{ $row['position_class']??'-' }}</td><td>{{ $row['incumbents']??'-' }}</td><td>{{ $row['requirements']??'-' }}</td><td>{{ $row['vacancies']??'-' }}</td><td>{{ $row['incumbents']!==null && $row['requirements']!==null ? $row['incumbents']-$row['requirements'] : '-' }}</td></tr>@empty<tr><td colspan="8">Tidak ada data untuk pilihan ini.</td></tr>@endforelse
-            </tbody><tfoot><tr><th colspan="4">Total sesuai filter</th><td>{{ $peta['incumbents'] }}</td><td>{{ $peta['requirements'] }}</td><td>{{ $peta['vacancies'] }}</td><td>{{ $gap }}</td></tr></tfoot></table></div>
+        <!-- Navigasi Cepat Kedua Tabel -->
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6 p-2 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
+            <div class="flex items-center gap-2 pl-3">
+                <svg class="w-4 h-4 text-blue-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                </svg>
+                <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Filter Tabel Formasi:</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="#tabel-kepala-bbpmp" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-900 border border-blue-200/80 hover:bg-blue-100 transition-all shadow-2xs">
+                    <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                    <span>Dibawah Kepala BBPMP JATIM</span>
+                </a>
+                <a href="#tabel-kabag-umum" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-900 border border-indigo-200/80 hover:bg-indigo-100 transition-all shadow-2xs">
+                    <span class="w-2 h-2 rounded-full bg-indigo-600"></span>
+                    <span>Dibawah Kepala Bagian Umum</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 2 Tabel Peta Jabatan -->
+        <div class="space-y-8">
+            @include('public-dashboard.position-table', [
+                'id' => 'tabel-kepala-bbpmp',
+                'title' => 'Kebutuhan dan ketersediaan pegawai dibawah Kepala BBPMP JATIM',
+                'unitBadge' => 'Kepala BBPMP JATIM',
+                'badgeColor' => 'blue',
+                'icon' => 'bbpmp',
+                'peta' => $peta,
+                'gap' => $gap,
+            ])
+
+            @include('public-dashboard.position-table', [
+                'id' => 'tabel-kabag-umum',
+                'title' => 'Kebutuhan dan ketersediaan pegawai dibawah Kepala Bagian Umum',
+                'unitBadge' => 'Kepala Bagian Umum',
+                'badgeColor' => 'indigo',
+                'icon' => 'kabag',
+                'peta' => $peta,
+                'gap' => $gap,
+            ])
         </div>
     </section>
 @endif
