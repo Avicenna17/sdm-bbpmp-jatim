@@ -948,6 +948,38 @@ UAT Phase 02 wajib mencakup TC-PAK-029–038 dan TC-PAK-006. Kasus lintas fase d
 - [ ] Documentary gap memakai MISSING_POSITION_HISTORY, bukan PARTIAL_MONTH_REQUIRES_REVIEW atau SOURCE_POSITION_LINK_REQUIRES_REVIEW. TMT tengah/akhir bulan sendiri tidak memicu partial requested-range issue.
 - [ ] Resolution read-only/deterministic: original TMT/end/provenance tidak berubah; tidak menulis history, evaluation, PakCase, audit, atau conversion run.
 
+## TC-PAK-041 — Conversion run schema, immutable persistence dan assessment boundary
+
+**Contract:** OD-09 RESOLVED dan OD-10 RESOLVED for schema/auth/audit mutation boundary pada [Phase 02C plan](plans/phase-02c-resolution-conversion-runs.md#9-02c4--conversion-run-schema--persistence). TC-PAK-041 adalah umbrella persistence acceptance contract lintas 02C.4–02C.6. Acceptance 02C.4 hanya membutuhkan structural/schema/immutable-persistence requirements berlabel `[02C.4]`. Orchestration, mutation authorization/audit dan review lifecycle menjadi executable gate `[02C.5]`; replacement runtime behavior/concurrency menjadi executable gate `[02C.6]`. Planned items slice berikutnya yang belum executable tidak memblok acceptance 02C.4. Checklist ini bukan executable tests atau klaim fitur sudah tersedia.
+
+- [ ] [02C.4] Tepat runs + periods schema; tanpa third monthly-assignment/segment table. FK RESTRICT, upgrade/rollback dependency order, SQLite dan disposable MariaDB verification sesuai compatibility gate.
+- [ ] [02C.4] Unique case/revision, nullable predecessor, nullable active_case, dan run/line menolak collision; multiple historical NULL projections tetap valid.
+- [ ] [02C.4] PREVIEW/REQUIRES_REVIEW wajib active_case_id = pak_case_id; SUPERSEDED wajib NULL. Structural/model guards menolak inconsistent status/case/projection, cross-person/source/rule ownership, self-reference dan invalid predecessor/sequence.
+- [ ] [02C.5] Locked case N dengan successful atomic save menghasilkan case N+1 dan run.case_lock_version N+1. Expected pre-save N tidak disimpan sebagai authoritative run version. Failure tidak meninggalkan run/period/audit/version parsial.
+- [ ] [02C.4] Period contiguous full-month, month_count integer positif sesuai interval, deterministic line_number; tidak double-cover bulan. Period bukan salinan otomatis position segment.
+- [ ] [02C.4] Exact numerator/denominator canonical integer strings, simplified, numerator nonnegative, denominator positif; tolak exponent/float/negative/zero denominator dan half-null pair tanpa native-int coercion atau pembulatan.
+- [ ] [02C.4] Tidak menyimpan rounded machine/human output sebagai authoritative values; simpan profile/version untuk recomputation. Golden persistence fixture exact lines 25/6, 25, 25, 125/6 dan exact total 75 round-trip tanpa AK Dasar/Integrasi/cumulative 175.
+- [ ] [02C.5] Orchestration menghasilkan golden exact lines dan total 75 tersebut dari exact calculation, lalu merecompute presentation dari profile/version; tidak menjumlahkan rounded line values.
+- [ ] [02C.4] Persistence invariants mempertahankan incomplete run total NULL, bukan zero/subtotal; partial OD-03 tidak direpresentasikan sebagai fabricated periods atau complete count/list dari interior months.
+- [ ] [02C.5] Orchestration partial OD-03 mempertahankan tanggal asli dan tidak membuat fabricated periods, normalized range, atau complete count/list dari interior months.
+- [ ] [02C.4] Diagnostic lines boleh mempunyai NULL source/history/rule references dan snapshots. rule_snapshot NULL jika failure sebelum rule resolution, bukan `{}`/synthetic rule. Calculated lines wajib applicable snapshots/operands/exact results.
+- [ ] [02C.4] Source-history proof berbeda reference dari selected monthly position history; tidak dipaksa sama. Snapshot tetap bermakna setelah live source/history superseded.
+- [ ] [02C.4] Manifest v1 menyimpan delapan approved groups, canonical monthly assignments/proof, supporting histories dan relevant source candidate-set evidence termasuk Annual absence/presence. Tidak serialize whole Eloquent models.
+- [ ] [02C.4] Satu canonical calculation contract version awal 1, snapshot schema version dan existing rounding profile/version; tanpa lima algorithm columns. Fingerprints bukan replay/idempotency decision.
+- [ ] [02C.4] Model boundary menjaga snapshot/context/operands/results/original issues/trace/predecessor identity immutable dan no delete; hanya lifecycle metadata yang diizinkan dapat berubah. Authorization lifecycle mutation diuji pada slice service.
+- [ ] [02C.5] PakCase first-use tetap authoritative; preview tidak menandai; save tidak silently repair marker historis.
+- [ ] [02C.5] Inactive actor atau missing required permission ditolak sebelum mutation. View/save/recalc/assessment/evidence/audit mengikuti approved permission bundles dan record boundary; no new permission/role.
+- [ ] [02C.6] Actual replacement menguji authorization mutation dan record boundary yang sama, termasuk inactive actor/missing permission rejection sebelum perubahan state.
+- [ ] [02C.5] Ordinary preview/stale assessment read-only tanpa row/audit. Initial save menghasilkan PREVIEW atau REQUIRES_REVIEW sesuai issues dan tepat satu CONVERSION_RUN_SAVED.
+- [ ] [02C.5] Explicit assessment memakai review_assessment/review_assessed_by/review_assessed_at; event CONVERSION_RUN_REVIEW_ASSESSED untuk PREVIEW → REQUIRES_REVIEW atau REQUIRES_REVIEW assessment update. Bukan approval/finalization dan tidak mengubah original snapshot.
+- [ ] [02C.5] Tolak REQUIRES_REVIEW → PREVIEW in place dan mutation keluar dari terminal SUPERSEDED. Annual/correction tidak otomatis mengubah status/angka atau membuat successor.
+- [ ] [02C.4] Schema/model mendukung replacement melalui unique direct successor, immutable original predecessor identity dan supersession metadata; tidak memerlukan replacement service/runtime pada acceptance 02C.4.
+- [ ] [02C.6] Actual replacement membuat old run SUPERSEDED dan new run PREVIEW/REQUIRES_REVIEW secara atomik. Event CONVERSION_RUN_REPLACED subject successor, predecessor via supersedes_id; tanpa duplicate SAVED atau period event. Runtime/concurrency proof mengikuti gate 02C.6.
+- [ ] [02C.5] Audit failure rollback save/assessment mutation. Payload hanya before/after/reason/supersedes_id dengan bounded safe identifiers/status/revision/issue-code summaries; tanpa manifest/full snapshots/NIP/document bodies/private paths/SQL/error traces.
+- [ ] [02C.6] Audit failure rollback replacement mutation; event replacement memenuhi payload/privacy boundary yang sama.
+
+OD-07 business replacement policy, OD-08 replay/idempotency, dan OD-11 rule validity tetap di gate masing-masing; umbrella specification ini tidak menyelesaikan keputusan tersebut atau mewajibkan runtime 02C.5/02C.6 pada acceptance 02C.4.
+
 ## Klarifikasi teknis Foundation
 
 Uji whitelist DUK published tanpa izin SDM; histori verified tanpa tanggal fiktif; organisasi historis bertanggal; nullable validity DRAFT; pasangan tanggal valid; overlap rule diperbolehkan; purpose_type terpisah dari mekanisme/hasil; retensi akun/audit. Integrasi kebutuhan berikutnya memakai published batch/version Peta Jabatan, bukan bulan DUK.

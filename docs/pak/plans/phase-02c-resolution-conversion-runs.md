@@ -332,34 +332,81 @@ Jangan memakai `PARTIAL_MONTH_REQUIRES_REVIEW` (requested-range boundary OD-03) 
 
 ## 9. 02C.4 — Conversion Run Schema + Persistence
 
-DDL final diturunkan setelah DTO 02C.1–02C.3 stabil.
+### OD-09 — RESOLVED
+
+Contract schema berikut disetujui setelah DTO 02C.1–02C.3 final (`960532c`). Persistence memakai tepat dua tabel: `pak_conversion_runs` → `pak_conversion_periods`. Tidak ada tabel monthly-assignment atau segment ketiga. Monthly position assignments/proof tetap canonical immutable data dalam versioned dependency manifest; position segments hanya derived grouping.
+
+Period adalah contiguous calculation/diagnostic line dengan source/position/rule/result dependencies yang compatible, bukan salinan langsung `PositionSegment`. Desain lama `database-pak.md` tetap referensi historis; decimal month count, `raw_ak`/`rounded_ak`, dan periods langsung dimiliki case tidak menggantikan contract final ini.
+
+Pada tabel berikut, **I** = immutable setelah authoritative save; **L** = mutable hanya melalui authorized lifecycle service. Semua FK memakai RESTRICT. Ini schema contract untuk implementasi slice berikutnya, bukan migration atau perubahan database pada approval ini.
 
 ### `pak_conversion_runs`
 
-Kandidat kelompok data:
+| Column | Type / nullable | FK / purpose | Boundary |
+|---|---|---|---|
+| `id` | unsigned BIGINT, PK | Run identity | I |
+| `pak_case_id` | unsigned BIGINT, required | `pak_cases.id` | I |
+| `person_id` | unsigned BIGINT, required | `people.id`, canonical identity | I |
+| `pak_rule_set_id` | unsigned BIGINT, required | `pak_rule_sets.id`, explicit case rule set | I |
+| `revision_number` | unsigned INTEGER, required | Server-assigned revision | I |
+| `predecessor_run_id` | unsigned BIGINT, nullable | Self-FK, original predecessor | I |
+| `revision_reason` | TEXT, nullable | Required for replacement through service guard | I |
+| `status` | VARCHAR(30), required | PREVIEW / REQUIRES_REVIEW / SUPERSEDED | L |
+| `active_case_id` | unsigned BIGINT, nullable | `pak_cases.id`, unique current-run projection | L |
+| `requested_start`, `requested_end` | DATE, required | Exact original requested range | I |
+| `case_lock_version` | unsigned INTEGER, required | Authoritative case version AFTER successful save increment | I |
+| `dependency_fingerprint` | CHAR(64), required | Semantic input/dependency fingerprint; not unique | I |
+| `snapshot_fingerprint` | CHAR(64), required | Immutable snapshot/result integrity; not unique | I |
+| `snapshot_schema_version` | unsigned SMALLINT, required | Manifest/snapshot serialization version | I |
+| `calculation_contract_version` | unsigned SMALLINT, required | One pipeline contract; initial canonical application value `1` | I |
+| `rounding_profile` | VARCHAR(50), required | Existing PREVIEW_ONLY profile | I |
+| `rounding_version` | unsigned SMALLINT, required | Existing policy version, currently `1` | I |
+| `dependency_manifest` | JSON, required | Versioned immutable context/dependency/proof data | I |
+| `original_issues` | JSON, required | Original issues; empty list if none | I |
+| `calculation_trace` | JSON, required | Explicit bounded-layout calculation/proof trace | I |
+| `total_numerator`, `total_denominator` | TEXT, nullable pair | Exact total; both NULL if any requested month uncalculated | I |
+| `review_assessment` | JSON, nullable | Explicit assessment; not approval | L |
+| `review_assessed_by` | unsigned BIGINT, nullable | `users.id`, assessment actor | L |
+| `review_assessed_at` | TIMESTAMP, nullable | Assessment time | L |
+| `superseded_by_user_id` | unsigned BIGINT, nullable | `users.id`, replacement actor | L |
+| `superseded_at` | TIMESTAMP, nullable | Explicit supersession time | L |
+| `created_by` | unsigned BIGINT, required | `users.id` | I |
+| `created_at`, `updated_at` | Repository timestamps | Creation immutable; updated_at reflects authorized lifecycle mutation | I / L |
 
-- Case, Person, explicit rule set.
-- Requested calculation context.
-- Server revision number dan nullable predecessor.
-- Lifecycle status.
-- Nullable exact total numerator/denominator.
-- Immutable dependency manifest/fingerprint.
-- Original calculation issues/trace.
-- Review-assessment metadata terpisah.
-- Actor/time/revision reason/supersession provenance.
-- Presentation profile/version.
+`case_lock_version` is the post-save authoritative version: locked case N → validate/recalculate → persist run/periods/audit and increment case atomically → case N+1 and run.case_lock_version N+1. Pre-save expected version is transaction/concurrency input, not the persisted run version. Failure rolls back all changes. Semantic dependency fingerprint excludes optimistic-version increments, so save itself does not make the run stale.
+
+Projection: PREVIEW/REQUIRES_REVIEW → `active_case_id = pak_case_id`; SUPERSEDED → `active_case_id = NULL`. Nullable unique projection enforces at most one current/non-superseded run per case together with mandatory service projection/status/case consistency guards. No partial unique index. Successor is derived through unique predecessor relation; no redundant successor column is required.
 
 ### `pak_conversion_periods`
 
-- Run ID dan deterministic line number.
-- Contiguous start/end dan integer month count.
-- Evaluation/history/functional-level references.
-- Predicate/coefficient rule references.
-- Exact operands.
-- Original coverage dan applied range.
-- Immutable snapshots/provenance/trace.
-- Nullable exact line numerator/denominator.
-- Original line issues.
+All period fields are immutable after authoritative save.
+
+| Column | Type / nullable | FK / purpose |
+|---|---|---|
+| `id` | unsigned BIGINT, PK | Line identity |
+| `pak_conversion_run_id` | unsigned BIGINT, required | `pak_conversion_runs.id` |
+| `line_number` | unsigned INTEGER, required | Deterministic order within run |
+| `period_start`, `period_end` | DATE, required | Contiguous full-month applied range |
+| `month_count` | unsigned INTEGER, required | Positive inclusive coverage-month count matching boundaries |
+| `performance_evaluation_id` | unsigned BIGINT, nullable | `performance_evaluations.id`, selected source |
+| `source_position_history_id` | unsigned BIGINT, nullable | `employee_position_histories.id`, source-history proof if used |
+| `employee_position_history_id` | unsigned BIGINT, nullable | `employee_position_histories.id`, selected monthly position |
+| `functional_level_id` | unsigned BIGINT, nullable | `functional_levels.id` |
+| `performance_predicate_rule_id` | unsigned BIGINT, nullable | `performance_predicate_rules.id` |
+| `ak_coefficient_rule_id` | unsigned BIGINT, nullable | `ak_coefficient_rules.id` |
+| `predicate_factor` | DECIMAL(8,4), nullable, no numeric default | Exact operand snapshot under 02B contract |
+| `annual_coefficient` | DECIMAL(15,6), nullable, no numeric default | Exact operand snapshot under 02B contract |
+| `result_numerator`, `result_denominator` | TEXT, nullable pair | Exact calculated result |
+| `source_snapshot` | JSON, nullable | Source identity/content fingerprints, formal coverage and provenance |
+| `position_snapshot` | JSON, nullable | Selected position/history/level/TMT/SK/verification provenance |
+| `rule_snapshot` | JSON, nullable | Resolved rule metadata/values when available |
+| `original_issues` | JSON, required | Original diagnostics; empty list if none |
+| `calculation_trace` | JSON, required | Selection/proof/calculation trace |
+| `created_at`, `updated_at` | Repository timestamps | No period update after save |
+
+Diagnostic lines may fail before source/history/rule resolution: unresolved references/snapshots stay NULL, including `rule_snapshot`; do not fabricate `{}` or synthetic rule data. Calculated lines require applicable source/position/rule snapshots, exact operands and results through service invariants. Source-history proof and selected monthly position remain distinct references, without forced equality.
+
+Diagnostic-line month_count describes known full-month coverage, not successful numeric calculation. For OD-03 partial requests preserve exact dates/issues on the run, keep canonical coverage/count unavailable, and do not fabricate periods or count only interior full months. Overall exact total remains NULL. Full-month diagnostics retain affected-month provenance in original issues/trace.
 
 ### Canonical month list
 
@@ -373,24 +420,46 @@ Noncontiguous months menjadi line berbeda. Guard memastikan boundaries/count kon
 
 ### Exact persistence
 
-- Numerator/denominator berupa exact integer strings.
-- Denominator positif.
-- Pasangan NULL konsisten.
+- Numerator berupa canonical nonnegative integer string, denominator canonical positive integer string; simplified rational form.
+- Storage TEXT; no scientific notation, no float, and no requirement to convert to PHP native integer.
+- Pasangan sama-sama present atau sama-sama NULL; no zero denominator.
 - Bulan tak terhitung menyebabkan total keseluruhan NULL.
 - Human/machine presentation direcompute dari exact values dan policy version.
 - Tidak menjadikan rounded values authoritative.
 
+DB enforces only safe, simple compatible structural constraints. Canonical integer-string validation, positivity and simplification remain service/value-object invariants where complex MariaDB CHECK logic would reduce portability. Exact operand DECIMAL definitions retain 02B precision/scale; they do not replace rational result storage.
+
+### Dependency manifest v1 dan versions
+
+| Group | Immutable content |
+|---|---|
+| `case_context` | Case/person/rule identity, relevant authoritative case context and period used |
+| `coverage` | Original requested dates, completeness, canonical months/year partitions or unavailable partial state |
+| `source_candidates` | Relevant candidate-set evidence, including Annual absence/presence, IDs and fingerprints |
+| `selected_sources` | Selected evaluation snapshots, formal coverage versus applied months, selection reason and history proof |
+| `position_assignments` | Canonical monthly assignments and supporting continuity references; segments remain derived |
+| `history_dependencies` | Original intervals, verification/supersession state and safe documentary provenance needed for replay/stale assessment |
+| `rule_set` | Explicit rule-set reference and immutable code/version/validity/reference snapshot |
+| `versions` | Snapshot schema, one calculation pipeline contract and existing rounding profile/version |
+
+No whole Eloquent serialization. Live FK references alone do not replace immutable scalar snapshots. Selected source/history/rules retain both; supporting candidate/history references and snapshots live in the manifest without a third table. Future source/history supersession must not rewrite run meaning.
+
+One canonical application constant/value represents initial calculation contract version `1`. Do not create separate algorithm columns for five components. Existing rounding constants remain authoritative; no rounded display columns. Fingerprints are not idempotency keys; OD-08 remains deferred.
+
 ### Constraints
 
 - FK RESTRICT.
-- Unique case + revision.
-- Unique nullable predecessor.
-- Unique run + line number.
+- Unique `(pak_case_id, revision_number)` — `pcr_case_revision_uq`.
+- Unique nullable `predecessor_run_id` — `pcr_predecessor_uq`.
+- Unique nullable `active_case_id` — `pcr_active_case_uq`.
+- Unique `(pak_conversion_run_id, line_number)` — `pcp_run_line_uq`.
 - No overlapping counted months.
 - Person/source/history/rule-set consistency.
 - No delete atau calculation-snapshot rewrite.
 
-**OD-09:** final widths, manifest layout, indexes, dan current-run projection diputuskan setelah DTO final.
+Service guards additionally enforce same-case predecessor, revision sequence, no self-reference/branching, projection/status consistency and cross-person/source/rule ownership. FK/unique constraints are database defenses, not replacements for application locking/OD-05. Add parent `(person_id, created_at)` lookup index and necessary FK indexes without redundant indexes already covered by a leftmost prefix. Do not index exact TEXT/JSON payloads for this slice.
+
+PakRuleSet first-use remains owned by PakCase lifecycle. 02C.4 adds no marker; preview never marks first use. 02C.5 respects/verifies the case's already-used rule set and must not silently repair historical first-use state. OD-07 remains BUSINESS PENDING, OD-08 deferred, and OD-11 open.
 
 ## 10. Run lifecycle dan immutability
 
@@ -422,12 +491,26 @@ Setelah save, tidak boleh diubah:
 
 - Lifecycle status.
 - Review-assessment metadata.
-- Reviewed actor/time.
+- `review_assessed_by` / `review_assessed_at` (assessment actor/time, not approval).
 - Supersession metadata.
 
 Lifecycle mutation tidak pernah mengubah calculation snapshot.
 
 Original issue tidak dihapus atau ditulis ulang ketika assessment baru dibuat. Run dengan sebagian line terhitung dapat menyimpan diagnostics, tetapi total lengkap tetap NULL.
+
+### Explicit state machine — OD-10 resolved boundary
+
+| Operation | Persisted outcome |
+|---|---|
+| Ordinary read-only preview | No row, no audit |
+| Authoritative initial save without unresolved run issues | PREVIEW |
+| Authoritative initial save with unresolved issues | REQUIRES_REVIEW |
+| Explicit assessment requiring review | PREVIEW → REQUIRES_REVIEW |
+| Subsequent explicit review assessment update | REQUIRES_REVIEW → REQUIRES_REVIEW |
+| Explicit replacement | Predecessor PREVIEW/REQUIRES_REVIEW → SUPERSEDED; successor → PREVIEW or REQUIRES_REVIEW |
+| SUPERSEDED | Terminal |
+
+No generic status setter, free-form approval workflow, or in-place REQUIRES_REVIEW → PREVIEW. Assessment explains why a run requires examination; it does not approve AK, finalize PAK, resolve original issues in place, or change the immutable calculation snapshot. Resolved/recalculated dependencies produce an explicit successor subject to replacement business gates. Annual/correction arrival causes no automatic transition or successor.
 
 ## 11. 02C.5 — Conversion Run Orchestration
 
@@ -474,7 +557,7 @@ Orchestration menyatukan source dan position results; kedua resolver tidak salin
 - Re-resolve/recalculate.
 - Run rule set sama dengan locked case rule set.
 - Preview fingerprint/dependency berubah → reject dan preview ulang.
-- Persist run/lines/audit dan increment case version atomik.
+- Persist run/lines/audit dan increment case version atomik; run.case_lock_version menyimpan resulting N+1, bukan pre-save expected N.
 - Tidak mengubah case period secara implisit.
 
 Pisahkan semantic fingerprint dari optimistic version agar save sendiri tidak membuat run langsung stale.
@@ -519,6 +602,7 @@ Selected quarterly yang tidak berubah tidak membuktikan selection masih valid se
 
 - Read-only assessment tidak mengubah persisted state.
 - Explicit service mengunci case/run, re-assess, lalu menyimpan review metadata/status dan audit atomik.
+- Field metadata adalah `review_assessment`, `review_assessed_by`, `review_assessed_at`; bukan `reviewed_by/reviewed_at`. Event mutation adalah `CONVERSION_RUN_REVIEW_ASSESSED`.
 - Annual/correction tidak mengubah angka lama atau otomatis membuat successor.
 - Original calculation snapshot tetap immutable.
 - Persisted status tidak diklaim otomatis selalu up-to-date; domain assessment disajikan terpisah.
@@ -587,26 +671,31 @@ Real independent-process proof menjadi gate 02C.6.
 
 ## 15. Authorization dan audit
 
-Actor aktif dan `pak.access` selalu diperlukan.
+### OD-10 — RESOLVED for schema/auth/audit mutation boundary
+
+Actor aktif dan `pak.access` selalu diperlukan. Authoritative mutation service sendiri authorize sebelum perubahan state melalui existing `PakEmployeeAuthorization`/service conventions; panel/policy bukan sole enforcement. Tidak menambah role atau permission Phase 02C.
 
 | Operation | Permissions |
 |---|---|
 | View run | `pak.conversion.view`, `pak.case.view` |
-| Preview/save/recalculate | `pak.conversion.calculate`, `pak.conversion.view`, `pak.case.view`, `pak.case.update`, `pak.skp.view`, `pak.employee.view`, `pak.rule-set.view` |
-| View evidence | `pak.skp.view` + record/person boundary |
-| Explicit review mutation | Finalisasi melalui OD-10 |
+| Preview/save/recalculate/replace | `pak.conversion.calculate`, `pak.conversion.view`, `pak.case.view`, `pak.case.update`, `pak.skp.view`, `pak.employee.view`, `pak.rule-set.view` |
+| Explicit review assessment mutation | Same complete permission bundle as authoritative save/recalculate/replace |
+| View source evidence | `pak.skp.view` + authorized run/case/person boundary |
+| Audit history | `pak.audit.view` according to existing architecture |
 
 Tidak menambah permission tanpa kebutuhan approved.
 
-Proposed audit events tetap menunggu OD-10:
+Approved operation events:
 
-- `CONVERSION_RUN_SAVED`
-- `CONVERSION_RUN_REPLACED`
-- `CONVERSION_RUN_REVIEW_REQUIRED`
+| Event | Operation / subject contract |
+|---|---|
+| `CONVERSION_RUN_SAVED` | Authoritative initial save only; subject new run, case reference required; exactly one event whether PREVIEW or initial REQUIRES_REVIEW |
+| `CONVERSION_RUN_REVIEW_ASSESSED` | Explicit assessment mutation; subject existing run and case reference; covers PREVIEW → REQUIRES_REVIEW and subsequent REQUIRES_REVIEW assessment update |
+| `CONVERSION_RUN_REPLACED` | Explicit replacement; subject successor run, case reference required, original predecessor in `supersedes_id` / safe bounded before-after references |
 
-Subject run ditambahkan secara terbatas ke allowlist. Payload tetap existing top-level whitelist, dengan nested safe IDs/status/revision/reason/issue codes.
+Add only `PakConversionRun` to restricted conversion-run audit subject allowlist. No period-level subject/event. Replacement does not emit a duplicate SAVED event. Read-only preview/stale assessment emits no event. Audit and mutation occur in the same transaction.
 
-Tidak ada whole-model serialization, NIP, raw workbook, private paths, atau exception traces.
+Payload stays within `before`, `after`, `reason`, `supersedes_id`: bounded safe identifiers/status/revision/issue-code summaries only. Do not include dependency manifest, full snapshots, NIP, document bodies, private paths, SQL/error traces or whole-model serialization. Assessment is not approval/finalization; remaining replay behavior stays OD-08, not implicitly resolved by event naming.
 
 ## 16. Exact arithmetic/presentation boundary
 
@@ -687,8 +776,8 @@ Independent processes/connections, bounded timeouts, and fresh final assertions 
 | **02C.1** | OD-01/02 dan active eligibility diterapkan; DTO/tests lulus |
 | **02C.2** | OD-03 RESOLVED; implementasi mengikuti full-month-only contract dan TC-PAK-039; coverage dan requested-range guards lulus |
 | **02C.3** | OD-04 RESOLVED; continuity-first menghasilkan assignment/provenance atau structured issues; position/proof integration dan TC-PAK-040 lulus; tidak mengimplikasikan perubahan source/schema |
-| **02C.4** | DTO final; OD-09 schema dan bagian audit OD-10 disepakati |
-| **02C.5** | OD-10/11 selesai; OD-08 API behavior ditetapkan; 02C.5.1 lengkap sebelum acceptance 02C.5.2 |
+| **02C.4** | DTO final; OD-09 RESOLVED dan OD-10 schema/auth/audit mutation boundary RESOLVED; implement approved schema contract dan hanya items `[02C.4]` pada umbrella TC-PAK-041; planned executable gates `[02C.5]`/`[02C.6]` tidak memblok acceptance 02C.4 |
+| **02C.5** | Terapkan OD-10 resolved boundary; OD-11 selesai; OD-08 API behavior ditetapkan; 02C.5.1 lengkap sebelum acceptance 02C.5.2 |
 | **02C.6** | Replacement/replay final; required MariaDB races dan relevant 02A regression lulus |
 
 Tidak ada slice ketujuh. 02C.5.1/02C.5.2 hanya decomposition delivery internal.
@@ -721,8 +810,8 @@ Tidak ada slice ketujuh. 02C.5.1/02C.5.2 hanya decomposition delivery internal.
 | OD-06 Stale/review | **RESOLVED direction** | Read-only assessment + explicit authorized mutation |
 | OD-07 Annual-late replacement | **BUSINESS PENDING** | BR-SKP-008 tetap; no auto replacement |
 | OD-08 Replay/idempotency | **DEFERRED within 02C** | Finalisasi 02C.5/02C.6 |
-| OD-09 Persistence detail | **DEFERRED within 02C** | Setelah DTO 02C.1–02C.3 final |
-| OD-10 Audit/review authorization | **OPEN DECISION** | Selesai sebelum 02C.4/02C.5 |
+| OD-09 Persistence detail | **RESOLVED** | Runs + periods; immutable manifest/snapshots, TEXT exact rational, approved projection/version schema; gate 02C.4 |
+| OD-10 Audit/review authorization | **RESOLVED for schema/auth/audit mutation boundary** | Existing permission bundle; assessment fields/event, explicit lifecycle transitions and atomic bounded audit; no approval/finalization |
 | OD-11 Rule validity behavior | **OPEN DECISION** | Selesai sebelum 02C.5 numeric orchestration |
 | Active source eligibility | **RESOLVED invariant** | CURRENT + OFFICIAL + ANNUAL/Q1–Q4 |
 | Requested-range containment | **RESOLVED invariant** | Valid non-empty subset/equal authoritative case period |
