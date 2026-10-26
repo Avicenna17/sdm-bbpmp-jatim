@@ -39,7 +39,7 @@ Sumber SKP sekarang di-resolve sesuai prioritas bisnis; operator meninjau hasil 
 
 Semua hasil Phase 02 tetap PREVIEW/REQUIRES_REVIEW/SUPERSEDED. Tidak menambah FINAL/COMPLETED/APPROVED/PAK_ESTABLISHED, akumulasi, penetapan, KP/KJ, atau KGB. Tabel, service architecture, permission, dan checkpoint 02A–02E tetap; test specification disinkronkan melalui TC-PAK-003/004 dan TC-PAK-029–038.
 
-Yang masih pending: BR-SKP-008 (kebijakan refresh/revision calculation/draft triwulan ketika annual tersedia kemudian), BR-PERIOD-003, BR-APPOINT-008, BR-KJ-005, BR-BAL-003 serta BR-BAL-004 yang masih proposed; dasar resmi mapping Nurmaulida, pengesahan nilai master REFERENCE, lintas versi regulasi, retensi evidence, dan requested range batas hari parsial selain keputusan TMT. Keputusan TMT untuk perhitungan bulanan tidak menyelesaikan trigger saldo/keputusan administratif BR-BAL-003.
+Yang masih pending: BR-SKP-008 (kebijakan refresh/revision calculation/draft triwulan ketika annual tersedia kemudian), BR-PERIOD-003, BR-APPOINT-008, BR-KJ-005, BR-BAL-003 serta BR-BAL-004 yang masih proposed; dasar resmi mapping Nurmaulida, pengesahan nilai master REFERENCE, lintas versi regulasi, dan retensi evidence. Requested range batas hari parsial kemudian diselesaikan melalui OD-03 di bawah. Keputusan TMT untuk perhitungan bulanan tidak menyelesaikan trigger saldo/keputusan administratif BR-BAL-003.
 
 ## Klarifikasi final checkpoint dokumentasi
 
@@ -49,3 +49,11 @@ Yang masih pending: BR-SKP-008 (kebijakan refresh/revision calculation/draft tri
 - **CALCULATION BR-KONV-004:** simpan/hitung presisi penuh, jangan bulatkan baris, jumlahkan nilai presisi penuh, ROUND_HALF_UP hanya output/total akhir maksimum tiga desimal.
 - **DISPLAY:** trim trailing zeros: 100.000 -> 100; 18.750 -> 18,75; 12.500 -> 12,5; 20.833 -> 20,833. Formatting tidak mengubah calculation.
 - Konsep/permission provisional pada desain terdahulu dipertahankan sebagai referensi historis/retensi tanpa membuka alur input provisional Phase 02. Arsitektur, tabel, chain, baseline permissions dan checkpoint tidak diubah. Golden Nurmaulida tetap numeric fixture tanpa mapping JF/jenjang rekaan.
+
+# Keputusan client Phase 02C — OD-03 FINAL RESOLVED
+
+**Sumber:** persetujuan eksplisit client atas OD-03 setelah acceptance 02C.1 (`73b87b0`); bukan klaim verifikasi regulasi baru. Contract authoritative: [OD-03 pada Phase 02C plan](plans/phase-02c-resolution-conversion-runs.md#od-03--resolved-partial-requested-range). Tidak membuat business-rule ID baru atau mengubah approval status rule lain.
+
+Requested range wajib valid, non-empty, start <= end, contained dalam PakCase period, mulai tanggal 1 dan berakhir hari terakhir bulan (termasuk leap year) untuk directly calculable pada aspek boundary bulan. Partial start/end mempertahankan exact original dates dan menghasilkan `PARTIAL_MONTH_REQUIRES_REVIEW`; tidak ada prorata, date rounding, auto-expand, silent dropping, partial month = zero, atau complete conversion dari full months di tengah saja.
+
+Review tidak mengotorisasi partial calculation. Diperlukan explicit revised full-month requested range yang tetap contained atau future explicit business decision. Tidak ada implicit case-period mutation/corrected range otomatis; perubahan case period memakai lifecycle case terlebih dahulu. TMT tengah/akhir bulan dan formal source coverage berbeda dari applied months tidak memicu issue ini sendiri. OD-04 dan BR-PERIOD-003 tetap belum diselesaikan oleh OD-03. Acceptance 02C.2 mengacu TC-PAK-039; keputusan ini documentation-only, bukan implementasi resolver.

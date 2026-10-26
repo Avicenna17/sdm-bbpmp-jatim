@@ -865,7 +865,7 @@ Semua kasus berikut adalah spesifikasi dokumenter. Angka koefisien/faktor sintet
 
 **Rule:** BR-JAB-001. Given request Jan–Okt, jenjang lama koefisien fixture 12.5 berlaku Jan–Sep, jenjang baru koefisien 25 TMT 15 Oktober; predikat terpilih Baik. Expected raw = (9/12 × 12.5) + (1/12 × 25) = 275/24; total output 11,458. Seluruh Oktober memakai 25, bukan prorata hari; Januari–September tidak memakai 25 secara retroaktif.
 
-Ulangi TMT baru 1 Oktober dan 31 Oktober: hasil sama. Tambahkan perubahan lain koefisien fixture 37.5 pada TMT 25 Oktober setelah TMT 15 Oktober: seluruh Oktober memakai 37.5; raw total = (9/12 × 12.5) + (1/12 × 37.5) = 12.5, display 12,5. Record dengan ID/urutan Excel/import paling akhir tetapi TMT lebih awal tidak menang. TMT asli dan SK tidak diubah. Tidak menghasilkan PARTIAL_MONTH_REQUIRES_REVIEW hanya karena TMT; requested range parsial lain tetap belum diputuskan.
+Ulangi TMT baru 1 Oktober dan 31 Oktober: hasil sama. Tambahkan perubahan lain koefisien fixture 37.5 pada TMT 25 Oktober setelah TMT 15 Oktober: seluruh Oktober memakai 37.5; raw total = (9/12 × 12.5) + (1/12 × 37.5) = 12.5, display 12,5. Record dengan ID/urutan Excel/import paling akhir tetapi TMT lebih awal tidak menang. TMT asli dan SK tidak diubah. Tidak menghasilkan PARTIAL_MONTH_REQUIRES_REVIEW hanya karena TMT; requested range parsial mengikuti OD-03 RESOLVED dan TC-PAK-039.
 
 ## TC-PAK-034 — Regime TMT dan AK Integrasi existing
 
@@ -888,6 +888,33 @@ Ulangi TMT baru 1 Oktober dan 31 Oktober: hasil sama. Tambahkan perubahan lain k
 **Rules:** BR-DATA-001, BR-REF-001. Requirement dokumen resmi mencakup KARPEG, tempat/tanggal lahir, TMT pangkat/gol, dan TMT jabatan -> SK dengan provenance. Default unit/instansi harus berlabel default client, tidak otomatis menjadi bukti historis. Tabel perpindahan/target KP/KJ yang tersedia sebagai guidance tidak mengaktifkan calculator fase berikutnya atau mengubah hasil Phase 02. Checkpoint ini tidak mengubah importer, schema, atau UI executable.
 
 UAT Phase 02 wajib mencakup TC-PAK-029–038 dan TC-PAK-006. Kasus lintas fase di matriks V1 tidak dianggap selesai hanya karena konversi Phase 02 lulus.
+
+## TC-PAK-039 — Requested range full-month dan partial review
+
+**Contract:** OD-03 RESOLVED pada [Phase 02C plan](plans/phase-02c-resolution-conversion-runs.md#od-03--resolved-partial-requested-range); BR-SKP-003 dan boundary BR-JAB-001 tetap dipertahankan. Planned acceptance 02C.2, bukan executable test atau klaim sudah diimplementasikan. Seluruh valid-range fixtures berikut diasumsikan contained dalam authoritative PakCase period.
+
+| Requested start .. end | Expected boundary outcome |
+|---|---|
+| `2026-01-01 .. 2026-03-31` | Jan, Feb, Mar; count 3 |
+| `2026-01-15 .. 2026-03-31` | Partial-start: PARTIAL_MONTH_REQUIRES_REVIEW |
+| `2026-01-01 .. 2026-03-15` | Partial-end: PARTIAL_MONTH_REQUIRES_REVIEW |
+| `2026-01-15 .. 2026-03-15` | Partial-both: PARTIAL_MONTH_REQUIRES_REVIEW |
+| `2026-02-01 .. 2026-02-28` | Februari; count 1 |
+| `2024-02-01 .. 2024-02-29` | Februari leap year; count 1 |
+| `2024-02-01 .. 2024-02-28` | Partial-end: PARTIAL_MONTH_REQUIRES_REVIEW |
+| `2026-02-15 .. 2026-02-15` | PARTIAL_MONTH_REQUIRES_REVIEW; bukan count zero |
+| `2025-12-01 .. 2026-02-28` | 3 months; 2 year partitions |
+| `2026-02-01 .. 2026-02-29` | Invalid date, bukan partial review |
+| `2026-03-31 .. 2026-01-01` | Invalid/reversed range, bukan partial review |
+
+- [ ] Exact case range hanya lolos boundary validation jika requested boundary-nya sendiri full-month. Valid full-month subset yang contained dapat lolos meskipun authoritative PakCase period memiliki boundary parsial; eligibility lainnya tetap diperiksa.
+- [ ] Starts-before, ends-after, dan fully outside case ditolak; tidak menghasilkan saved run.
+- [ ] Case `2026-01-15 .. 2026-03-15` dengan request `2026-02-01 .. 2026-02-28` dapat lolos boundary validation; case period tidak diubah.
+- [ ] Semua partial cases mempertahankan exact original dates; tidak menghasilkan complete canonical counted-month list/count, tidak memakai count zero, dan tidak menghitung hanya full months di tengah sebagai complete conversion.
+- [ ] Tidak ada prorata, date rounding, auto-expand, silent dropping, atau corrected range otomatis. Review tidak mengotorisasi partial calculation.
+- [ ] TMT posisi tengah/akhir bulan sendiri tidak memicu partial-range issue; formal source coverage yang berbeda dari applied months juga tidak memicunya.
+- [ ] Coverage resolution read-only: tidak mengubah PakCase, evaluation, history, atau menulis audit. Perubahan request/case harus eksplisit melalui lifecycle yang sesuai.
+- [ ] OD-04 history end/gap dan BR-PERIOD-003 rolling window tidak diasumsikan selesai oleh test ini.
 
 ## Klarifikasi teknis Foundation
 

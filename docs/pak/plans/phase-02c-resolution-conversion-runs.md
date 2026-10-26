@@ -247,11 +247,17 @@ Range satu tanggal tetap tunduk pada keputusan partial-period; validitas tanggal
 - Gap tidak diisi predikat atau nol.
 - Requested dates asli dipertahankan.
 
-### OD-03 — Gate sebelum 02C.2
+### OD-03 — RESOLVED: Partial Requested Range
 
-Perlakuan requested range dengan batas hari parsial harus diputuskan sebelum implementasi slice.
+Phase 02 conversion menggunakan **FULL-MONTH calculation semantics**. Requested range directly calculable pada aspek boundary bulan hanya jika tanggal valid, rentang non-empty, requested start <= requested end, seluruh range contained dalam authoritative PakCase period, start adalah tanggal 1 bulan awal, dan end adalah hari terakhir valid bulan akhir, termasuk leap year. Boundary yang valid tidak menggantikan validasi source, history, rule, gap, atau eligibility lainnya.
 
-Sampai diputuskan, jangan prorata, memperluas rentang, atau membuang bulan parsial. Existing `PARTIAL_MONTH_REQUIRES_REVIEW` tetap berlaku.
+Jika start atau end partial, pertahankan exact original requested dates dan hasilkan structured issue `PARTIAL_MONTH_REQUIRES_REVIEW`. Jangan melakukan day proration, date rounding, auto-expand, atau silent dropping partial month. Partial month bukan zero. Jangan menghasilkan complete canonical counted-month list/count untuk seluruh request atau menghitung hanya full months di tengah lalu menganggap complete conversion tersedia.
+
+Review issue tidak mengotorisasi perhitungan partial month. Direct calculation memerlukan explicit revised requested range yang full-month dan tetap contained dalam PakCase period, atau future explicit business decision. Resolver tidak mengubah PakCase period atau membuat corrected requested range otomatis. Jika case period perlu berubah, gunakan PakCase lifecycle terlebih dahulu.
+
+Partiality ditentukan dari requested start/end, bukan TMT tengah/akhir bulan atau perbedaan formal SKP coverage dengan applied months. BR-JAB-001 whole-month semantics tetap berlaku. OD-03 tidak menyelesaikan OD-04 history end/gap, BR-PERIOD-003 rolling window, atau keputusan bisnis lain.
+
+**Implementation gate 02C.2:** ikuti contract OD-03 yang telah resolved; validate tanggal, urutan dan containment; preserve original dates; detect partial boundary tanpa normalisasi; generate canonical months, server-side year partitions dan inclusive count hanya untuk full-month-calculable range. Invalid date, reversed range dan out-of-case range tetap validation rejection masing-masing, bukan partial-month review. Planned acceptance cases tercatat pada TC-PAK-039.
 
 ## 8. 02C.3 — Position Segmentation
 
@@ -654,7 +660,7 @@ Independent processes/connections, bounded timeouts, and fresh final assertions 
 | Slice | Gate |
 |---|---|
 | **02C.1** | OD-01/02 dan active eligibility diterapkan; DTO/tests lulus |
-| **02C.2** | OD-03 selesai; coverage dan requested-range guards lulus |
+| **02C.2** | OD-03 RESOLVED; implementasi mengikuti full-month-only contract dan TC-PAK-039; coverage dan requested-range guards lulus |
 | **02C.3** | OD-04 selesai; position/proof integration lulus |
 | **02C.4** | DTO final; OD-09 schema dan bagian audit OD-10 disepakati |
 | **02C.5** | OD-10/11 selesai; OD-08 API behavior ditetapkan; 02C.5.1 lengkap sebelum acceptance 02C.5.2 |
@@ -684,7 +690,7 @@ Tidak ada slice ketujuh. 02C.5.1/02C.5.2 hanya decomposition delivery internal.
 |---|---|---|
 | OD-01 Quarterly relevance | **RESOLVED** | Quarter-start ≤ requested end month; annual priority |
 | OD-02 Evaluation–history proof | **RESOLVED** | Single annual tanpa FK prerequisite; explicit link lalu exact reconstruction |
-| OD-03 Partial requested range | **OPEN DECISION** | Selesai sebelum 02C.2 |
+| OD-03 Partial requested range | **RESOLVED** | Full-month-only; partial boundary menghasilkan PARTIAL_MONTH_REQUIRES_REVIEW tanpa complete counted-month list/count; wajib diikuti 02C.2 |
 | OD-04 History end/gap dalam bulan | **OPEN DECISION** | Selesai sebelum 02C.3 |
 | OD-05 Person coordination | **RESOLVED technical contract** | Complete protocol sebelum acceptance 02C.5; real proof 02C.6 |
 | OD-06 Stale/review | **RESOLVED direction** | Read-only assessment + explicit authorized mutation |
