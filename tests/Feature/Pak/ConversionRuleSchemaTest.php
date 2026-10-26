@@ -163,6 +163,13 @@ class ConversionRuleSchemaTest extends TestCase
 
     public function test_rollback_and_upgrade_from_phase_02a_preserve_existing_records(): void
     {
+        $conversionPaths = [
+            database_path('migrations/2026_10_26_000100_create_pak_conversion_runs.php'),
+            database_path('migrations/2026_10_26_000200_create_pak_conversion_periods.php'),
+        ];
+        foreach (array_reverse($conversionPaths) as $path) {
+            (require $path)->down();
+        }
         $paths = [
             database_path('migrations/2026_10_25_000100_create_performance_predicate_rules.php'),
             database_path('migrations/2026_10_25_000200_create_ak_coefficient_rules.php'),
@@ -196,6 +203,9 @@ class ConversionRuleSchemaTest extends TestCase
                     (require $path)->down();
                 }
             }
+        }
+        foreach ($conversionPaths as $path) {
+            (require $path)->up();
         }
         $this->assertDatabaseHas('pak_cases', ['id' => $case, 'pak_rule_set_id' => $rule]);
     }

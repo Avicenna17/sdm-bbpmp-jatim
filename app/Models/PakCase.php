@@ -29,6 +29,11 @@ class PakCase extends PakModel
         return $this->hasMany(PakEvent::class);
     }
 
+    public function conversionRuns()
+    {
+        return $this->hasMany(PakConversionRun::class);
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');

@@ -28,6 +28,13 @@ class SkpSourceMigrationTest extends TestCase
 
     public function test_fresh_rollback_upgrade_and_repeat_preserve_phase_one(): void
     {
+        $conversionPaths = [
+            database_path('migrations/2026_10_26_000100_create_pak_conversion_runs.php'),
+            database_path('migrations/2026_10_26_000200_create_pak_conversion_periods.php'),
+        ];
+        foreach (array_reverse($conversionPaths) as $path) {
+            (require $path)->down();
+        }
         $paths = glob(database_path('migrations/2026_10_23_*.php'));
         sort($paths);
         $this->assertCount(3, $paths);
@@ -55,6 +62,9 @@ class SkpSourceMigrationTest extends TestCase
             foreach ($before as $table => $records) {
                 $this->assertEquals($records, DB::table($table)->get()->toArray());
             }
+        }
+        foreach ($conversionPaths as $path) {
+            (require $path)->up();
         }
         $this->assertDatabaseHas('pak_cases', ['id' => $case, 'person_id' => $person]);
         $this->assertDatabaseHas('reporting_periods', ['id' => $period, 'status' => 'published']);
