@@ -459,7 +459,7 @@ One canonical application constant/value represents initial calculation contract
 
 Service guards additionally enforce same-case predecessor, revision sequence, no self-reference/branching, projection/status consistency and cross-person/source/rule ownership. FK/unique constraints are database defenses, not replacements for application locking/OD-05. Add parent `(person_id, created_at)` lookup index and necessary FK indexes without redundant indexes already covered by a leftmost prefix. Do not index exact TEXT/JSON payloads for this slice.
 
-PakRuleSet first-use remains owned by PakCase lifecycle. 02C.4 adds no marker; preview never marks first use. 02C.5 respects/verifies the case's already-used rule set and must not silently repair historical first-use state. OD-07 remains BUSINESS PENDING, OD-08 deferred, and OD-11 open.
+PakRuleSet first-use remains owned by PakCase lifecycle. 02C.4 adds no marker; preview never marks first use. 02C.5 respects/verifies the case's already-used rule set and must not silently repair historical first-use state. OD-07 remains BUSINESS PENDING, OD-08 deferred, and OD-11 is RESOLVED for numeric orchestration as specified in section 11.
 
 ## 10. Run lifecycle dan immutability
 
@@ -524,14 +524,14 @@ No generic status setter, free-form approval workflow, or in-place REQUIRES_REVI
 ### Pipeline
 
 1. Authorize.
-2. Load authoritative case.
-3. Validate requested range dan containment.
-4. Enumerate months/year partitions server-side.
-5. Collect eligible CURRENT sources.
-6. Resolve position per bulan.
+2. Load authoritative PakCase dan explicit PakRuleSet identity.
+3. Periksa rule-set existence, status, dan integrity.
+4. Validate requested range/containment dan OD-03 coverage; enumerate months/year partitions server-side hanya jika coverage complete.
+5. Terapkan OD-11 validity gate sebelum child numeric resolution; failure short-circuits numeric path seluruh request.
+6. Collect eligible CURRENT sources dan resolve position per bulan.
 7. Finalize source selection/proof.
-8. Bentuk contiguous calculation lines.
-9. Periksa regime, suitability, dan rule validity.
+8. Bentuk contiguous calculation/diagnostic lines menurut approved period-building contract.
+9. Periksa regime dan suitability.
 10. RuleResolver.
 11. ConversionInput.
 12. ConversionCalculator dan exact total.
@@ -539,6 +539,45 @@ No generic status setter, free-form approval workflow, or in-place REQUIRES_REVI
 14. Preview DTO/dependency fingerprint.
 
 Orchestration menyatukan source dan position results; kedua resolver tidak saling memanggil secara circular.
+
+### OD-11 — RESOLVED: rule validity dan child resolvability
+
+**Sumber:** keputusan client setelah decision audit pada baseline `7c5b6f8`; bukan klaim verifikasi regulasi baru. Bedakan explicit rule-set selection, temporal validity, dan child-rule resolvability.
+
+Numeric orchestration hanya memakai `PakCase.pak_rule_set_id`. Tidak memilih latest, memilih versi berdasarkan tanggal, fallback, atau split request antarversi. Validity inklusif dan kedua boundary harus diketahui:
+
+```text
+valid_from <= requested_start AND requested_end <= valid_until
+```
+
+Salah satu atau kedua tanggal NULL berarti UNKNOWN, bukan open-ended. Unknown boundary atau requested range partly/wholly outside validity menghasilkan `RULE_VALIDITY_REQUIRES_REVIEW` untuk seluruh requested calculation: tanpa numeric calculation, tanpa menghitung valid subset/interior months, tanpa silent month drop atau fabricated zero, dan exact total NULL. Tanggal request tetap asli. Authoritative diagnostic save sebagai REQUIRES_REVIEW diperbolehkan hanya jika seluruh authoritative-save gates lain sukses.
+
+Precedence wajib: (1) authoritative case/explicit rule identity → (2) rule existence/status/integrity → (3) requested-range validation/containment dan OD-03 coverage → (4) OD-11 validity → (5) child predicate/coefficient resolution → (6) numeric calculation. Validity failure short-circuits child numeric resolution; jangan menambah unrelated child-resolution issues akibat melanjutkan numeric path setelah global failure.
+
+Full-month request dengan validity failure tetap mempunyai canonical coverage; numeric results dan total NULL. Persisted diagnostic periods mengikuti contract 02C.4 yang sudah approved; OD-11 tidak menetapkan cardinality baru per-month maupun grouped periods. Partial OD-03 tetap tanpa fabricated canonical month list/count/periods; OD-11 tidak mengesampingkannya.
+
+Setelah validity lolos, predicate lookup memakai exact code dan coefficient lookup memakai exact canonical `functional_level_id`, tanpa alias, label matching, level substitution, arbitrary tie-break, atau fallback. Missing child membuat affected line diagnostic dan complete total NULL; valid lines lain dapat dihitung menurut existing incomplete-run contract, bukan sebagai subtotal total authoritative.
+
+| Outcome | Contract orchestration |
+|---|---|
+| `RULE_VALIDITY_REQUIRES_REVIEW` | Global diagnostics-only; bounded reason `UNKNOWN_BOUNDARY` atau `OUTSIDE_VALIDITY` |
+| `PREDICATE_RULE_NOT_FOUND` | Missing exact predicate; affected line diagnostic |
+| `COEFFICIENT_RULE_NOT_FOUND` | Missing exact coefficient untuk canonical level; affected line diagnostic |
+| `MISSING_FUNCTIONAL_LEVEL` | Position resolution sukses, tetapi selected authoritative position tidak menyediakan canonical level yang diperlukan untuk coefficient lookup |
+| `RULE_INTEGRITY_ERROR` | Duplicate/conflicting child, corrupt validity, atau ownership inconsistency; authoritative save ditolak |
+| `RULE_SET_NOT_USABLE` | Unsupported/corrupt rule-set state; authoritative save ditolak |
+| `RULE_SET_NOT_FOUND` | Explicit rule set tidak tersedia; authoritative save ditolak |
+| `INVALID_RULE_INPUT` | Input resolver tidak memenuhi contract; rejection, bukan review-saveable condition |
+
+Empat review outcomes pertama boleh disimpan sebagai diagnostics hanya jika semua save gates lain sukses. Empat integrity/rejection outcomes terakhir boleh tampil sebagai safe preview diagnostics bila sesuai, tetapi tidak boleh menghasilkan authoritative contradictory run. Position gap/overlap tetap `MISSING_POSITION_HISTORY`/`AMBIGUOUS_POSITION_HISTORY`, bukan `MISSING_FUNCTIONAL_LEVEL`. Dua code baru membedakan temporal validity dari lifecycle/child absence dan missing canonical lookup key dari missing coefficient untuk key yang valid.
+
+`RULE_VALIDITY_REQUIRES_REVIEW` dapat membawa requested_start/end, validity dates, dan rule-set ID/version. Issues/audit hanya safe bounded context; jangan memuat document bodies, NIP, private paths, raw SQL, exception traces, atau whole-model serialization.
+
+DRAFT unused maupun used tetap resolvable oleh RuleResolver. First use membekukan editing, bukan membuat ACTIVE/PUBLISHED. Child predicate/coefficient tidak memiliki inactive lifecycle state; inactive FunctionalLevel tetap historically readable/resolvable. RuleResolver/calculator tetap read-only; temporal gate dimiliki orchestration, bukan automatic rule-set selection.
+
+Used version dengan NULL validity tetap readable tetapi tidak numerically usable menurut OD-11. Jangan unlock/mutate versi historis. Remediasi: create/copy explicit new version, lengkapi validity sebelum first use, lalu associate melalui authorized PakCase lifecycle bila operasi tersebut tersedia/approved; bukan klaim automatic rule-set replacement API.
+
+Preview tetap read-only. Save/recalculation re-resolve dan revalidate gate yang sama; fingerprint/dependency mismatch tetap reject dan re-preview, termasuk diagnostic save. Snapshot calculation lama tidak diubah; validity metadata masuk dependency evidence untuk stale/review assessment. Tidak ada automatic successor. OD-07 BUSINESS PENDING dan OD-08 DEFERRED tidak berubah.
 
 ### Preview
 
@@ -740,7 +779,7 @@ Fixtures tambahan:
 | 02C.2 | Canonical months, inclusive count, cross-year/leap year, gap/overlap, exact case range, valid subset, starts-before, ends-after, fully outside, invalid/reversed range, approved partial-period behavior |
 | 02C.3 | TMT awal/tengah/akhir, multiple changes, missing/equal-TMT ambiguity, inactive master, corrected history, non-JF/regime review |
 | 02C.4 | Schema/FK/unique, contiguous-line guards, exact persistence, NULL total, immutable snapshot fields, permitted lifecycle-only mutation, upgrade/rollback |
-| 02C.5 | Authorization, preview read-only, locked-case range revalidation, no implicit case-period update, server recomputation, stale fingerprint/version, rule equality, atomic rollback, complete coordination protocol |
+| 02C.5 | Authorization, preview read-only, locked-case range revalidation, no implicit case-period update, server recomputation, stale fingerprint/version, rule equality, OD-11 validity/precedence/outcomes sesuai TC-PAK-042, atomic rollback, complete coordination protocol |
 | 02C.6 | Explicit review, replacement chain, stale predecessor, replay decision, real races, no partial state |
 
 Required MariaDB races:
@@ -777,7 +816,7 @@ Independent processes/connections, bounded timeouts, and fresh final assertions 
 | **02C.2** | OD-03 RESOLVED; implementasi mengikuti full-month-only contract dan TC-PAK-039; coverage dan requested-range guards lulus |
 | **02C.3** | OD-04 RESOLVED; continuity-first menghasilkan assignment/provenance atau structured issues; position/proof integration dan TC-PAK-040 lulus; tidak mengimplikasikan perubahan source/schema |
 | **02C.4** | DTO final; OD-09 RESOLVED dan OD-10 schema/auth/audit mutation boundary RESOLVED; implement approved schema contract dan hanya items `[02C.4]` pada umbrella TC-PAK-041; planned executable gates `[02C.5]`/`[02C.6]` tidak memblok acceptance 02C.4 |
-| **02C.5** | Terapkan OD-10 resolved boundary; OD-11 selesai; OD-08 API behavior ditetapkan; 02C.5.1 lengkap sebelum acceptance 02C.5.2 |
+| **02C.5** | Terapkan OD-10 resolved boundary dan OD-11 RESOLVED sesuai TC-PAK-042; OD-08 API behavior tetap harus ditetapkan; 02C.5.1 lengkap sebelum acceptance 02C.5.2 |
 | **02C.6** | Replacement/replay final; required MariaDB races dan relevant 02A regression lulus |
 
 Tidak ada slice ketujuh. 02C.5.1/02C.5.2 hanya decomposition delivery internal.
@@ -812,7 +851,7 @@ Tidak ada slice ketujuh. 02C.5.1/02C.5.2 hanya decomposition delivery internal.
 | OD-08 Replay/idempotency | **DEFERRED within 02C** | Finalisasi 02C.5/02C.6 |
 | OD-09 Persistence detail | **RESOLVED** | Runs + periods; immutable manifest/snapshots, TEXT exact rational, approved projection/version schema; gate 02C.4 |
 | OD-10 Audit/review authorization | **RESOLVED for schema/auth/audit mutation boundary** | Existing permission bundle; assessment fields/event, explicit lifecycle transitions and atomic bounded audit; no approval/finalization |
-| OD-11 Rule validity behavior | **OPEN DECISION** | Selesai sebelum 02C.5 numeric orchestration |
+| OD-11 Rule validity behavior | **RESOLVED** | Explicit case rule set; known inclusive validity covers entire request; NULL = unknown; failure diagnostics-only tanpa angka/total, conditional review save; precedence dan child outcomes mengikuti section 11; executable gate 02C.5/TC-PAK-042 |
 | Active source eligibility | **RESOLVED invariant** | CURRENT + OFFICIAL + ANNUAL/Q1–Q4 |
 | Requested-range containment | **RESOLVED invariant** | Valid non-empty subset/equal authoritative case period |
 | Calculation snapshot immutability | **RESOLVED invariant** | Lifecycle metadata saja yang boleh dimutasi melalui authorized service |

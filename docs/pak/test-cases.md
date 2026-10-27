@@ -978,7 +978,28 @@ UAT Phase 02 wajib mencakup TC-PAK-029–038 dan TC-PAK-006. Kasus lintas fase d
 - [ ] [02C.5] Audit failure rollback save/assessment mutation. Payload hanya before/after/reason/supersedes_id dengan bounded safe identifiers/status/revision/issue-code summaries; tanpa manifest/full snapshots/NIP/document bodies/private paths/SQL/error traces.
 - [ ] [02C.6] Audit failure rollback replacement mutation; event replacement memenuhi payload/privacy boundary yang sama.
 
-OD-07 business replacement policy, OD-08 replay/idempotency, dan OD-11 rule validity tetap di gate masing-masing; umbrella specification ini tidak menyelesaikan keputusan tersebut atau mewajibkan runtime 02C.5/02C.6 pada acceptance 02C.4.
+OD-07 business replacement policy tetap BUSINESS PENDING dan OD-08 replay/idempotency tetap DEFERRED. OD-11 kini RESOLVED dengan executable acceptance 02C.5 pada TC-PAK-042; bukan requirement retroaktif acceptance 02C.4. Umbrella TC-PAK-041 tidak mewajibkan runtime 02C.5/02C.6 pada acceptance 02C.4.
+
+## TC-PAK-042 — OD-11 explicit rule validity dan numeric orchestration
+
+**Ownership: Phase 02C.5.** Planned acceptance berdasarkan OD-11 RESOLVED, BR-AUDIT-001, dan section 11 Phase 02C plan. Ini dokumentasi acceptance, bukan executable test atau klaim implementasi tersedia; tidak menambah gate 02C.4.
+
+- [ ] [02C.5] Exact inclusive boundaries dan requested full-month subset yang wholly inside validity lolos validity gate; dependency/eligibility lain tetap diperiksa.
+- [ ] [02C.5] Request sebelum validity, setelah validity, crossing start, crossing end, atau crossing keduanya → `RULE_VALIDITY_REQUIRES_REVIEW` / `OUTSIDE_VALIDITY` untuk seluruh request. Boundary validity di tengah bulan tidak dinormalisasi; bila request keluar boundary, seluruh request tanpa numeric calculation.
+- [ ] [02C.5] `valid_from` NULL, `valid_until` NULL, dan keduanya NULL → `UNKNOWN_BOUNDARY`, bukan open-ended. Dates asli dipertahankan, results/total NULL, bukan zero/subtotal.
+- [ ] [02C.5] Precedence teruji: case/explicit identity → rule existence/status/integrity → range/containment dan OD-03 → validity → child resolution → numeric calculation. Validity gagal tidak memanggil child numeric resolution atau menghasilkan unrelated missing-child issues.
+- [ ] [02C.5] Full-month validity failure mempertahankan canonical coverage; diagnostic periods mengikuti existing 02C.4 period-building contract tanpa cardinality baru. OD-03 partial request tidak menghasilkan fabricated months/count/periods; OD-11 tidak menimpanya.
+- [ ] [02C.5] DRAFT unused/used tetap resolvable, tanpa status ACTIVE/PUBLISHED baru atau perubahan first-use marker oleh preview. Used version dengan NULL validity menghasilkan review tanpa unlock; remediation melalui explicit new/copy version dan authorized case lifecycle bila tersedia/approved.
+- [ ] [02C.5] Setelah validity lolos, missing exact predicate → `PREDICATE_RULE_NOT_FOUND`; missing exact coefficient untuk canonical level → `COEFFICIENT_RULE_NOT_FOUND`. Affected line diagnostic, complete total NULL. Valid lines tidak dijadikan subtotal total authoritative.
+- [ ] [02C.5] Position resolution sukses tanpa canonical functional_level_id → `MISSING_FUNCTIONAL_LEVEL`, tanpa ID/level/label substitution. Gap/overlap tetap `MISSING_POSITION_HISTORY`/`AMBIGUOUS_POSITION_HISTORY`, bukan missing-level issue.
+- [ ] [02C.5] Duplicate/conflicting child rules, corrupt validity, dan ownership mismatch → `RULE_INTEGRITY_ERROR`; unsupported/corrupt status → `RULE_SET_NOT_USABLE`; missing rule set → `RULE_SET_NOT_FOUND`; invalid resolver input → `INVALID_RULE_INPUT`. Tidak ada arbitrary winner atau authoritative contradictory save.
+- [ ] [02C.5] Empat review-saveable outcomes OD-11 dapat menghasilkan diagnostic REQUIRES_REVIEW hanya bila semua save gates sukses; integrity/rejection outcomes tidak dipersist sebagai authoritative run. Preview boleh memuat safe diagnostics bila sesuai.
+- [ ] [02C.5] Inactive historical FunctionalLevel tetap resolvable; tidak mengarang inactive lifecycle untuk child predicate/coefficient.
+- [ ] [02C.5] Diagnostic save tetap lock/reload/revalidate dan membandingkan dependency fingerprint; mismatch ditolak untuk re-preview. Ordinary preview tetap read-only tanpa run/audit/first-use mutation.
+- [ ] [02C.5] Historical saved snapshot, exact results, dan original issues tetap sama setelah dependency change; tidak ada automatic rewrite atau successor.
+- [ ] [02C.5] Tidak ada latest/date-based rule-set fallback, automatic split antarversi, silent month drop, valid-interior-month calculation saat global failure, fabricated zero, atau subtotal total.
+- [ ] [02C.5] Issue context bounded: requested/validity dates dan rule-set ID/version; tanpa document bodies, NIP, private paths, raw SQL, exception traces, atau whole-model serialization.
+- [ ] [02C.5] OD-07 tetap BUSINESS PENDING dan OD-08 tetap DEFERRED; test tidak mengunci replacement/replay business behavior yang belum disetujui.
 
 ## Klarifikasi teknis Foundation
 

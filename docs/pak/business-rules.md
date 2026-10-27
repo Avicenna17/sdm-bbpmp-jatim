@@ -737,6 +737,16 @@ Master rule memiliki minimal:
 - reference/source;
 - version/rule set.
 
+**Klarifikasi client Phase 02C — OD-11 RESOLVED (setelah audit baseline `7c5b6f8`):** bukan klaim authority/verifikasi regulasi baru; status SYSTEM rule ini tetap. Numeric orchestration hanya memakai explicit PakRuleSet milik PakCase. Kedua tanggal harus diketahui dan validity inklusif: `valid_from <= requested_start AND requested_end <= valid_until`. NULL berarti UNKNOWN, bukan open-ended.
+
+Unknown boundary atau request partly/wholly outside validity menghasilkan `RULE_VALIDITY_REQUIRES_REVIEW` untuk seluruh request tanpa numeric calculation dan dengan exact total NULL. Jangan memilih latest/versi lain berdasarkan tanggal, fallback, split antarversi, menghitung valid subset/interior months, silent month drop, atau fabricated zero. Diagnostic save REQUIRES_REVIEW diperbolehkan hanya jika seluruh authoritative-save gates lain sukses.
+
+Urutan: authoritative case/explicit rule identity → rule existence/status/integrity → range/containment dan OD-03 coverage → validity gate → child resolution → numeric calculation. Validity failure short-circuits child numeric resolution; jangan mengumpulkan unrelated missing-child issues setelah global failure. Full-month diagnostic periods tetap mengikuti approved 02C.4 contract, tanpa cardinality baru; partial OD-03 tetap tanpa fabricated months/count/periods.
+
+Setelah validity lolos, exact predicate/level lookup tanpa alias, label mapping, substitution atau tie-break tetap berlaku. `PREDICATE_RULE_NOT_FOUND`, `COEFFICIENT_RULE_NOT_FOUND`, dan `MISSING_FUNCTIONAL_LEVEL` menghasilkan diagnostic affected line dan incomplete total NULL. Code terakhir hanya untuk position resolution yang sukses tetapi tidak menyediakan canonical functional_level_id; gap/overlap tetap memakai position issue codes. Integrity/rejection (`RULE_INTEGRITY_ERROR`, `RULE_SET_NOT_USABLE`, `RULE_SET_NOT_FOUND`, `INVALID_RULE_INPUT`) tidak mengotorisasi authoritative contradictory run. Detail outcome dan safe issue context mengikuti [OD-11 pada plan Phase 02C](plans/phase-02c-resolution-conversion-runs.md#od-11--resolved-rule-validity-dan-child-resolvability).
+
+DRAFT unused/used tetap resolvable; first use mengunci editing, bukan menciptakan ACTIVE/PUBLISHED. Child rules tidak mempunyai inactive lifecycle; inactive FunctionalLevel tetap historical-resolvable. Used version dengan NULL validity tetap readable tetapi tidak numerically usable; remediasi melalui explicit new/copy version dengan validity lengkap sebelum first use dan authorized PakCase lifecycle bila tersedia/approved, tanpa unlock atau automatic replacement. Historical snapshots tetap immutable; preview read-only dan save/recalculation revalidate tanpa implicit rewrite. OD-07/OD-08 tidak diselesaikan oleh rule ini.
+
 ## BR-AUDIT-002 — Final record
 **Status:** SYSTEM
 

@@ -267,11 +267,14 @@ Minimal kode:
 |---|---|
 | `ANNUAL_SUBSET_REQUIRES_REVIEW` | Kode historis desain; tidak diterbitkan untuk annual subset yang sah menurut BR-SKP-002 |
 | `PARTIAL_MONTH_REQUIRES_REVIEW` | Requested range parsial di luar keputusan TMT; tidak berlaku hanya karena TMT tengah/akhir bulan |
-| `RULE_VALIDITY_REQUIRES_REVIEW` | Preview hanya jika input numerik tersedia |
+| `RULE_VALIDITY_REQUIRES_REVIEW` | Safe diagnostics boleh ditampilkan pada preview tanpa kalkulasi numerik untuk seluruh request; exact total NULL. Authoritative diagnostic save sebagai REQUIRES_REVIEW hanya jika seluruh save gate lainnya berhasil. |
 | `MISSING_POSITION_HISTORY` | Segment terdampak tidak dihitung |
 | `AMBIGUOUS_POSITION_HISTORY` | Segment terdampak tidak dihitung |
-| `MISSING_PREDICATE_RULE` | Segment terdampak tidak dihitung |
-| `MISSING_COEFFICIENT_RULE` | Segment terdampak tidak dihitung |
+| `PREDICATE_RULE_NOT_FOUND` | Setelah validity lolos, exact predicate code tidak memiliki matching child rule; line terdampak diagnostic, complete total NULL |
+| `COEFFICIENT_RULE_NOT_FOUND` | Setelah validity lolos, canonical functional_level_id tersedia tetapi exact coefficient rule tidak ditemukan; line terdampak diagnostic, complete total NULL |
+| `MISSING_FUNCTIONAL_LEVEL` | Position resolution sukses, tetapi selected authoritative position tidak menyediakan canonical functional_level_id untuk coefficient lookup; line terdampak diagnostic, complete total NULL. Gap/overlap tetap memakai position issue codes. |
+
+Validity gate, precedence yang short-circuit child numeric resolution, dan outcome mengikuti [OD-11 RESOLVED dalam plan Phase 02C](phase-02c-resolution-conversion-runs.md#od-11--resolved-rule-validity-dan-child-resolvability); executable acceptance dimiliki 02C.5/TC-PAK-042. Ketentuan tersebut menjadi acuan authoritative untuk rule validity pada parent plan ini.
 
 Tambahkan kode teknis `SOURCE_COVERAGE_GAP`, `SOURCE_CHANGED_REQUIRES_REVIEW`, dan `CASE_CONTEXT_CHANGED_REQUIRES_REVIEW`.
 
