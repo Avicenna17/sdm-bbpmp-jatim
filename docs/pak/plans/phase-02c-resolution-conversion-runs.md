@@ -676,13 +676,24 @@ Replay/idempotency diselesaikan pada 02C.5/02C.6 sebelum API final. Jangan menja
 
 Person row adalah coordination lock per person, bukan global/table/advisory lock.
 
+Canonical global resource order untuk 02C.5.1 dan future conversion integration:
+
+**Case → Person → RuleSet → relevant shared-master rows → predecessor conversion run → PerformanceEvaluation rows → EmployeePositionHistory rows.**
+
+Setiap service hanya memakai applicable subsequence; jangan memperoleh resource class yang lebih awal setelah class yang lebih akhir sudah dikunci. Shared-master order adalah **mapping → functional position → functional level → category**, dengan IDs ascending dalam setiap table. Lock hanya relevant rows; Person selalu mendahului shared master bila keduanya diperlukan. Tidak ada Person fan-out, table/global/advisory lock. Discovery reads hanya menentukan candidate lock set; authoritative validation memakai current reread setelah relevant locks. Jangan memperoleh master tambahan setelah history locking dimulai; dependency-set mismatch harus gagal aman, bukan membalik lock order.
+
 | Operation | Lock order |
 |---|---|
-| Conversion save | Case → Person → rule set → predecessor run → evaluations deterministic → histories deterministic |
+| Conversion save (integration contract only; 02C.5.2) | Case → Person → RuleSet → relevant shared masters → predecessor run → evaluations deterministic → histories deterministic |
 | SKP batch commit | Batch → Person IDs ascending → evaluation identities deterministic |
 | Evaluation correction | Person → original predecessor evaluation |
-| Initial/current creation | Person → evaluation identity |
-| Position history mutation | Person → history |
+| Initial/current creation | Person → evaluation/dependency validation/insertion; no new earlier-class locks after later-class locks |
+| Position history mutation | Person → relevant shared masters → deterministic current/locking history reads → mutation/audit |
+| Shared-master mutation | Relevant shared masters in fixed table/ID order; no Person fan-out |
+| DUK commit | ReportingPeriod → ImportBatch → affected existing Person IDs ascending → authoritative reread → mutation |
+| Existing PakCase capture/refresh | Case when refreshing → ReportingPeriod when DUK-backed → Person → RuleSet → relevant shared masters → history dependencies |
+
+Batch/ReportingPeriod are existing writer-specific prefixes, not new global coordination locks. Rule-set writers retain their applicable RuleSet/child locking; profile writers retain Person before authoritative profile reads. The global order does not add conversion operations to these writers.
 
 ### Implementation requirements
 
@@ -691,12 +702,43 @@ Person row adalah coordination lock per person, bukan global/table/advisory lock
 - Nested `createInitial()` tetap composable; jangan mengambil Person baru setelah evaluation locking dimulai.
 - Correction menentukan person target, lalu reload/validate original predecessor setelah lock; tidak mengikuti successor.
 - History validation existing tetap dipertahankan.
+- EmployeeHistoryService sudah mengambil Person lalu active mapping sebelum predecessor/overlap reads. Hardening mengubah visibility/locking reads, bukan membaliknya menjadi history-before-master. Shared-master writer dan authoritative readers memakai fixed order yang sama; writer exclusive, reader shared current locks sesuai kebutuhan.
 - Jangan rollout protocol parsial.
 - Gunakan authoritative/current reads untuk validation yang membutuhkan visibility terkini.
 - `useWritePdo()` saja bukan solusi REPEATABLE-READ snapshot.
 - Tidak ada filesystem operation dalam retry transaction.
 
 Cross-cutting changes pada accepted 02A dilakukan eksplisit dan wajib menjalankan relevant 02A regression/concurrency suite.
+
+### 02C.5.1 DUK boundary dan audit evidence
+
+DUK hardening termasuk coordination completeness pada 02C.5.1. Existing ImportService::commit melakukan checksum/staging I/O setelah ReportingPeriod/ImportBatch locks dan updateOrCreate Person dalam workbook order. Source/staging/checksum preparation harus dipindahkan sebelum lock-holding transaction; locked batch metadata dan prepared payload harus dicocokkan kembali sebelum mutation. Lock affected existing Persons ascending sebelum authoritative reread/mutation. Workbook order tetap provenance/output order, bukan lock order. New Person creation tetap menggunakan existing unique identity constraints; tidak ada merge/repair otomatis atau retry policy baru.
+
+Audit caller produksi menemukan ManageData::saveImport memanggil ImportService::commit tanpa outer transaction. Narrow enforcement boundary: commit menolak active caller transaction sebelum filesystem/storage access atau mutation, sehingga preparation tidak berjalan sambil caller memegang DB locks. Tidak perlu broad API redesign atau perubahan UI/business behavior. Commit tests yang dibungkus RefreshDatabase/test transaction harus dipisahkan ke non-wrapping test setup untuk jalur ini; tambahkan explicit outer-transaction rejection test dan pertahankan seluruh assertion identity/reimport/rollback. Existing committed no-op dan sanitized error behavior tetap dipertahankan di luar guard tersebut.
+
+### 02C.5.1 acceptance matrix dan harness
+
+Berikut executable coordination gates, bukan implementasi conversion save/replacement:
+
+| Gate | Required proof |
+|---|---|
+| Deterministic ordering | Batch sebelum seluruh relevant Persons ascending, lalu evaluation identities deterministic; correction Person sebelum original predecessor; Person → masters → histories, tanpa master↔history inversion |
+| Nested initial creation | Outer rollback tetap benar; nested create tidak mengambil Person baru setelah evaluation locking dimulai |
+| Current-read visibility | Snapshot lama tidak menjadi authoritative validation setelah coordination lock; pertahankan PakSkpImportRow shared current-read guard |
+| Retry/atomicity | Exact 40001/1213 bounded retries dan current-source unique handling tetap; original predecessor dipertahankan; exhaustion/nonretryable failure tidak meninggalkan partial rows/audit |
+| Existing SKP races | Import identical/different content, double commit, double correction, import-versus-correction kedua ordering, initial creation collision semantics tetap |
+| Cross-writer coordination | History vs evaluation create/correction, DUK vs SKP/history/case capture, shared-master writer vs authoritative history/case capture ter-serialize pada relevant row |
+| DUK vs DUK | Dua import menyentuh existing Persons yang sama dengan reversed workbook/person order: deterministic Person locks, identity/output semantics dan atomic rollback tetap |
+| Mixed DUK identities | Existing/new Person input mempertahankan unique identity constraints, provenance order, dan rollback penuh; tidak ada implicit merge atau retry policy baru |
+| DUK I/O boundary | Source/staging/checksum preparation tanpa held DB locks; outer transaction ditolak sebelum I/O; locked metadata/version mismatch menolak tanpa partial replacement |
+| Shared masters | Relevant rows saja, fixed table/ID order; tidak ada Person fan-out atau master acquisition setelah history locking |
+| Independence | Different-person operations tetap independen bila tidak berbagi master/dependency; jangan memakai global mutex |
+| Responsibility boundary | Tidak ada conversion run/audit baru, conversion case-version increment, atau first-use mutation tambahan; historical inactive-level dan history lifecycle semantics tetap |
+| Regression | Relevant 02A retry/concurrency, Foundation case/history/profile/master, rule first-use concurrency, 02C.1–02C.4, wider PAK, SDM Monitoring/import/template/publication/reimport; full repository regression sebelum final acceptance |
+
+Gunakan existing disposable MariaDB independent-process harness. Adapt barrier lama yang menunggu dua worker mencapai insert menjadi observed Person/master lock waits; serialization memang menahan worker kedua sebelum insert. Jangan melemahkan final-state, independent PID/connection, uniqueness, atomic audit, rollback, atau driver-error assertions. Jangan memaksa deadlock hanya untuk membuktikan concurrency; retry detection/recovery tetap diuji melalui existing exact-driver/fault-injection cases. SQLite bukan concurrency proof. MariaDB 10.5.11 clean path dan known unrelated 10.5.10 legacy fresh-schema issue tetap dilaporkan terpisah.
+
+Future-save lock-holder probes hanya membuktikan coordination boundary, bukan actual conversion-save correctness. Real conversion-save/replacement races tetap gate 02C.6. Tidak ada migrations/schema/Composer/permission/isolation/business-rule change; tidak ada 02C.5.2 preview/save/review orchestration atau 02C.6 replacement pada slice ini. OD-07 tetap BUSINESS PENDING dan OD-08 tetap DEFERRED.
 
 ### Retry
 
