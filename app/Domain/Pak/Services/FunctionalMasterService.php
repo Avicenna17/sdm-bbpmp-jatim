@@ -45,9 +45,10 @@ final class FunctionalMasterService
                 }
             }
             if ($type === 'mapping' && $data['is_active']) {
-                $position = FunctionalPosition::lockForUpdate()->findOrFail($data['functional_position_id']);
-                $level = FunctionalLevel::lockForUpdate()->findOrFail($data['functional_level_id']);
-                $category = FunctionalCategory::lockForUpdate()->findOrFail($level->functional_category_id);
+                $masters = app(SharedMasterLocks::class)->acquire(positionIds: [$data['functional_position_id']], levelIds: [$data['functional_level_id']], exclusive: true);
+                $position = $masters[FunctionalPosition::class][$data['functional_position_id']];
+                $level = $masters[FunctionalLevel::class][$data['functional_level_id']];
+                $category = $masters[FunctionalCategory::class][$level->functional_category_id];
                 if (! $position->is_active || ! $level->is_active || ! $category->is_active) {
                     throw ValidationException::withMessages(['is_active' => 'Mapping aktif membutuhkan JF, jenjang, dan kategori yang aktif.']);
                 }

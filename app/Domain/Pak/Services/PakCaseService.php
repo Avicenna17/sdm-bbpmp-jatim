@@ -48,7 +48,7 @@ final class PakCaseService
             }
         }
 
-        return app(EmployeeSnapshotService::class)->build($actor, $person, $data['employee_data_as_of'], $input['duk_snapshot_id'] ?? null, $input['organization'] ?? null);
+        return app(EmployeeSnapshotService::class)->build($actor, $person, $data['employee_data_as_of'], $input['duk_snapshot_id'] ?? null, $input['organization'] ?? null, current: true);
     }
 
     public function create(User $actor, array $input): PakCase

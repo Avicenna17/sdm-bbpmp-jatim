@@ -6,9 +6,13 @@ use App\Domain\Pak\Authorization\PakEmployeeAuthorization as Access;
 use App\Domain\Pak\Enums\EmployeePositionType;
 use App\Models\EmployeePositionHistory;
 use App\Models\EmployeeRankHistory;
+use App\Models\FunctionalCategory;
+use App\Models\FunctionalLevel;
+use App\Models\FunctionalPosition;
 use App\Models\FunctionalPositionLevel;
 use App\Models\Person;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -30,9 +34,11 @@ final class EmployeeHistoryService
             Person::lockForUpdate()->findOrFail($person->id);
             if ($position) {
                 if ($data['position_type'] === 'JF') {
-                    $mapping = FunctionalPositionLevel::where('functional_position_id', $data['functional_position_id'] ?? 0)->where('functional_level_id', $data['functional_level_id'] ?? 0)->where('is_active', true)
-                        ->whereHas('functionalPosition', fn ($q) => $q->where('is_active', true))->whereHas('functionalLevel', fn ($q) => $q->where('is_active', true)->whereHas('category', fn ($c) => $c->where('is_active', true)))->lockForUpdate()->first();
-                    if (! $mapping) {
+                    $mapping = FunctionalPositionLevel::where('functional_position_id', $data['functional_position_id'] ?? 0)->where('functional_level_id', $data['functional_level_id'] ?? 0)->sharedLock()->first();
+                    $masters = $mapping ? app(SharedMasterLocks::class)->acquire(mappingIds: [$mapping->id]) : [];
+                    $level = $mapping ? $masters[FunctionalLevel::class][$mapping->functional_level_id] : null;
+                    if (! $mapping || ! $mapping->is_active || ! $masters[FunctionalPosition::class][$mapping->functional_position_id]->is_active
+                        || ! $level->is_active || ! $masters[FunctionalCategory::class][$level->functional_category_id]->is_active) {
                         throw ValidationException::withMessages(['functional_level_id' => 'Pilih pasangan JF/jenjang aktif yang terverifikasi.']);
                     }
                 } elseif (! empty($data['functional_position_id']) || ! empty($data['functional_level_id'])) {
@@ -40,11 +46,15 @@ final class EmployeeHistoryService
                 }
             }
             $class = $position ? EmployeePositionHistory::class : EmployeeRankHistory::class;
-            $old = $supersedesId ? $class::where('person_id', $person->id)->whereNull('superseded_at')->findOrFail($supersedesId) : null;
-            $overlap = $class::where('person_id', $person->id)->whereNull('superseded_at')
-                ->when($old, fn ($q) => $q->whereKeyNot($old->id))
-                ->whereDate('tmt_start', '<=', $data['tmt_end'] ?? '9999-12-31')
-                ->where(fn ($q) => $q->whereNull('tmt_end')->orWhereDate('tmt_end', '>=', $data['tmt_start']))->exists();
+            // One current read, ordered before validation; no later master acquisition.
+            $histories = $class::where('person_id', $person->id)->whereNull('superseded_at')->orderBy('id')->lockForUpdate()->get();
+            $old = $supersedesId ? $histories->find($supersedesId) : null;
+            if ($supersedesId && ! $old) {
+                throw (new ModelNotFoundException)->setModel($class, [$supersedesId]);
+            }
+            $overlap = $histories->contains(fn ($row) => $row->id !== $old?->id
+                && $row->tmt_start->format('Y-m-d') <= ($data['tmt_end'] ?? '9999-12-31')
+                && ($row->tmt_end === null || $row->tmt_end->format('Y-m-d') >= $data['tmt_start']));
             if ($overlap) {
                 throw ValidationException::withMessages(['tmt_start' => 'Rentang histori utama bertumpang tindih. Koreksi tanggal akhir histori sebelumnya secara eksplisit.']);
             }

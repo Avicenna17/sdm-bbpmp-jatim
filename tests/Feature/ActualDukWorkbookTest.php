@@ -10,11 +10,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Tests\Support\DatabaseWithoutWrappingTransaction;
 use Tests\TestCase;
 
 class ActualDukWorkbookTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\DatabaseWithoutWrappingTransaction { DatabaseWithoutWrappingTransaction::refreshDatabase insteadof RefreshDatabase; }
 
     public function test_september_workbook_preview_and_commit_in_isolated_database(): void
     {

@@ -28,10 +28,11 @@ final class EmployeeReferenceQuery
             ->through(fn ($row) => (new DukReferenceData($row->getAttributes()))->toArray());
     }
 
-    public function find(User $actor, int $snapshotId, int $personId, string $asOf, ?int $periodId = null): DukReferenceData
+    public function find(User $actor, int $snapshotId, int $personId, string $asOf, ?int $periodId = null, bool $current = false): DukReferenceData
     {
         $row = $this->query($actor)->where('personnel_snapshots.id', $snapshotId)->where('personnel_snapshots.person_id', $personId)
-            ->when($periodId, fn ($q) => $q->where('p.id', $periodId))->whereDate('p.period_month', '<=', $asOf)->firstOrFail();
+            ->when($periodId, fn ($q) => $q->where('p.id', $periodId))->whereDate('p.period_month', '<=', $asOf)
+            ->when($current, fn ($q) => $q->sharedLock())->firstOrFail();
 
         return new DukReferenceData($row->getAttributes());
     }

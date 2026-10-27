@@ -1,10 +1,16 @@
 <?php
 
 // Test-only process entrypoint. Credentials arrive on stdin and are never returned.
+use App\Domain\Import\ImportService;
+use App\Domain\Pak\Services\EmployeeHistoryService;
+use App\Domain\Pak\Services\FunctionalMasterService;
+use App\Domain\Pak\Services\PakCaseService;
 use App\Domain\Pak\Services\PerformanceEvaluationService;
 use App\Domain\Pak\Services\SkpFingerprintSerializer;
 use App\Domain\Pak\Services\SkpImportCommitService;
+use App\Models\ImportBatch;
 use App\Models\PerformanceEvaluation;
+use App\Models\Person;
 use App\Models\User;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Connection;
@@ -52,7 +58,7 @@ if ($input['barrier'] === 'create') {
     });
 } elseif ($input['barrier'] === 'hold') {
     DB::listen(function ($event) use (&$once, $signal, $wait, $input) {
-        if ($once && str_contains($event->sql, 'for update') && str_contains($event->sql, $input['lock_table'])) {
+        if ($once && (str_contains($event->sql, 'for update') || str_contains($event->sql, 'lock in share mode')) && str_contains($event->sql, $input['lock_table'])) {
             $once = false;
             $signal('held');
             $wait();
@@ -68,6 +74,17 @@ try {
         $result += ['committed_by' => $batch->committed_by, 'committed_at' => $batch->committed_at->format('Y-m-d H:i:s'),
             'summary' => $batch->summary, 'rows' => $batch->rows()->orderBy('record_ordinal')->get()->map(fn ($row) => ['id' => $row->id, 'status' => $row->processing_status->value, 'evaluation_id' => $row->performance_evaluation_id])->all()];
         $result['status'] = $batch->status->value;
+    } elseif ($input['operation'] === 'history') {
+        $history = app(EmployeeHistoryService::class)->record($actor, Person::findOrFail($input['person']), $input['history'], true);
+        $result['history_id'] = $history->id;
+    } elseif ($input['operation'] === 'duk') {
+        app(ImportService::class)->commit($actor, ImportBatch::findOrFail($input['batch_id']));
+        $result['status'] = ImportBatch::findOrFail($input['batch_id'])->status;
+    } elseif ($input['operation'] === 'case') {
+        $case = app(PakCaseService::class)->create($actor, $input['case']);
+        $result['case_id'] = $case->id;
+    } elseif ($input['operation'] === 'master') {
+        app(FunctionalMasterService::class)->save($actor, $input['type'], $input['master'], $input['master_id']);
     } else {
         $stream = fopen('php://memory', 'w+b');
         fwrite($stream, json_encode([$input['source']], JSON_THROW_ON_ERROR));

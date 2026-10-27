@@ -517,6 +517,37 @@ class SkpImportCommitTest extends TestCase
         $this->assertGreaterThan(0, $batchLocks);
     }
 
+    public function test_all_people_are_locked_in_id_order_before_evaluation_identity_processing(): void
+    {
+        $other = Person::factory()->create(['nip' => '001234567890123457']);
+        $batch = $this->prepare([['nip' => $other->nip], ['nip' => $this->person->nip]]);
+        $seen = [];
+        $evaluationStarted = false;
+        Person::addGlobalScope('person-order', function ($builder) use (&$seen, &$evaluationStarted) {
+            $builder->getQuery()->beforeQuery(function ($q) use (&$seen, &$evaluationStarted) {
+                if ($q->lock === true) {
+                    $id = (int) $q->getBindings()[0];
+                    if (! in_array($id, $seen, true)) {
+                        $this->assertFalse($evaluationStarted, 'No new Person after evaluation locks');
+                        $seen[] = $id;
+                    }
+                }
+            });
+        });
+        PerformanceEvaluation::addGlobalScope('evaluation-order', function ($builder) use (&$seen, &$evaluationStarted, $other) {
+            $builder->getQuery()->beforeQuery(function ($q) use (&$seen, &$evaluationStarted, $other) {
+                if ($q->lock === true) {
+                    $this->assertSame([$this->person->id, $other->id], $seen);
+                    $evaluationStarted = true;
+                }
+            });
+        });
+        $this->service->commit($this->actor, $batch->id);
+        $this->assertTrue($evaluationStarted);
+        $this->assertSame([$this->person->id, $other->id], $seen);
+        $this->assertSame(2, PerformanceEvaluation::count());
+    }
+
     #[DataProvider('currentContents')]
     public function test_collision_retry_requeries_current_and_reclassifies(string $predicate, string $expected): void
     {

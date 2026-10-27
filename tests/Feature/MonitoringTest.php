@@ -26,11 +26,12 @@ use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Tests\Support\DatabaseWithoutWrappingTransaction;
 use Tests\TestCase;
 
 class MonitoringTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\DatabaseWithoutWrappingTransaction { DatabaseWithoutWrappingTransaction::refreshDatabase insteadof RefreshDatabase; }
 
     private User $admin;
 

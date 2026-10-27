@@ -18,7 +18,7 @@ final class EmployeeProfileService
 
         return DB::transaction(function () use ($actor, $person, $data) {
             Person::lockForUpdate()->findOrFail($person->id);
-            $profile = EmployeeProfile::firstOrNew(['person_id' => $person->id]);
+            $profile = EmployeeProfile::where('person_id', $person->id)->lockForUpdate()->first() ?? new EmployeeProfile(['person_id' => $person->id]);
             $before = $profile->getAttributes();
             $profile->fill($data + ['verified_by' => $actor->id, 'verified_at' => now(), 'updated_by' => $actor->id]);
             if (! $profile->exists) {

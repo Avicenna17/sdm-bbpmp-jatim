@@ -17,11 +17,12 @@ use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Tests\Support\DatabaseWithoutWrappingTransaction;
 use Tests\TestCase;
 
 class PositionDocumentationTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\DatabaseWithoutWrappingTransaction { DatabaseWithoutWrappingTransaction::refreshDatabase insteadof RefreshDatabase; }
 
     public function test_template_can_change_and_extend_years_and_display_every_field(): void
     {

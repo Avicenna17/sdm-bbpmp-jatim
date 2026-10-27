@@ -18,7 +18,9 @@ use App\Models\PakSkpImportBatch;
 use App\Models\PakSkpImportRow;
 use App\Models\PerformanceEvaluation;
 use App\Models\User;
+use App\Support\Database\PersonLocks;
 use DateTimeInterface;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -96,14 +98,15 @@ final class SkpImportCommitService
             return $batch;
         }
         $this->ready($batch);
-        $rows = $batch->rows()->orderBy('record_ordinal')->get();
+        $rows = $batch->rows()->orderBy('record_ordinal')->sharedLock()->get();
+        $people = PersonLocks::acquire($rows->filter(fn ($row) => in_array($row->processing_status, [RowStatus::READY, RowStatus::DUPLICATE, RowStatus::CONFLICT], true))->pluck('person_id')->filter()->all());
         $groups = [];
         foreach ($rows as $row) {
             if (in_array($row->processing_status, [RowStatus::PENDING, RowStatus::IMPORTED], true)) {
                 throw new SkpCommitException('FINGERPRINT_PAYLOAD_MISMATCH', $batchId);
             }
             if (in_array($row->processing_status, [RowStatus::READY, RowStatus::DUPLICATE, RowStatus::CONFLICT], true)) {
-                $record = $this->reconstruct($row);
+                $record = $this->reconstruct($row, $people);
                 $groups[$this->serializer->sourceIdentityFingerprint($record)][] = ['row' => $row, 'record' => $record];
             }
         }
@@ -128,7 +131,7 @@ final class SkpImportCommitService
         return $batch->refresh();
     }
 
-    private function reconstruct(PakSkpImportRow $row): NormalizedSkpRecord
+    private function reconstruct(PakSkpImportRow $row, Collection $people): NormalizedSkpRecord
     {
         try {
             $raw = $row->raw_provenance['source'] ?? null;
@@ -141,7 +144,7 @@ final class SkpImportCommitService
             $raw['stable_identifier_evidence'] = $this->evidence($raw['stable_identifier_evidence'], $row);
             $source = new SkpSourceRowData(...$raw);
             $this->active->validate($source);
-            $person = $this->matcher->match($source->nip);
+            $person = $this->matcher->matchCoordinated($source->nip, $people);
             if ($person->status !== SkpPersonResolutionStatus::MATCHED || $row->person_resolution_status !== SkpPersonResolutionStatus::MATCHED
                 || $person->person_id !== $row->person_id || $row->match_method !== $person->match_method) {
                 $this->integrity($row);

@@ -2,25 +2,39 @@
 
 namespace Tests\Feature\Pak;
 
+use App\Domain\Pak\Services\EmployeeHistoryService;
 use App\Domain\Pak\Services\PerformanceEvaluationService;
 use App\Domain\Pak\Services\SkpFingerprintSerializer;
 use App\Domain\Pak\Services\SkpImportPreparationService;
+use App\Models\EmployeePositionHistory;
+use App\Models\FunctionalCategory;
+use App\Models\FunctionalLevel;
+use App\Models\FunctionalPosition;
+use App\Models\FunctionalPositionLevel;
+use App\Models\ImportBatch;
+use App\Models\PakCase;
+use App\Models\PakConversionRun;
 use App\Models\PakEvent;
 use App\Models\PakSkpImportBatch;
 use App\Models\PerformanceEvaluation;
 use App\Models\Person;
+use App\Models\PersonnelSnapshot;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Permission;
 use Symfony\Component\Process\Process;
+use Tests\Support\Pak\DukCoordinationFixtures;
 use Tests\Support\Pak\SyntheticSkpSourceAdapter;
 use Tests\TestCase;
 
 class SkpImportConcurrencyTest extends TestCase
 {
+    use DukCoordinationFixtures;
+
     private string $root;
 
     private User $actor;
@@ -118,6 +132,11 @@ class SkpImportConcurrencyTest extends TestCase
 
     private function pair(array $first, array $second, string $barrier, string $table = 'performance_evaluations'): array
     {
+        // Person coordination now serializes before INSERT; wait on the actual mutex.
+        if ($barrier === 'create') {
+            $barrier = 'hold';
+            $table = 'people';
+        }
         $workers = [];
         foreach ([$first, $second] as $index => $operation) {
             $input = $operation + ['db' => DB::connection()->getConfig(), 'root' => $this->root,
@@ -133,7 +152,10 @@ class SkpImportConcurrencyTest extends TestCase
             $this->await(fn () => is_file($this->root.'/1.connection'));
             $ids = [(int) file_get_contents($this->root.'/0.connection'), (int) file_get_contents($this->root.'/1.connection')];
             $this->assertNotSame($ids[0], $ids[1]);
-            if ($barrier === 'create') {
+            if ($barrier === 'independent') {
+                $this->await(fn () => ! $workers[1]->isRunning());
+                $this->assertTrue($workers[0]->isRunning(), 'Unrelated person completed while first still holds lock');
+            } elseif ($barrier === 'create') {
                 $this->await(fn () => is_file($this->root.'/1.held'));
             } else {
                 // Observe a real InnoDB lock wait between the independent workers before release.
@@ -170,6 +192,154 @@ class SkpImportConcurrencyTest extends TestCase
                 }
             }
         }
+    }
+
+    private function coordinationPermissions(): void
+    {
+        foreach (['pak.employee.manage', 'pak.employee.view', 'pak.case.create', 'pak.master.manage', 'import.commit', 'period.revise'] as $name) {
+            $this->actor->givePermissionTo(Permission::findOrCreate($name, 'web'));
+        }
+    }
+
+    private function historyInput(?Person $person = null): array
+    {
+        return ['operation' => 'history', 'person' => ($person ?? $this->person)->id,
+            'history' => ['position_name' => 'Synthetic', 'position_type' => 'PELAKSANA', 'tmt_start' => '2020-01-01', 'source_ref' => 'SYNTHETIC']];
+    }
+
+    public static function coordinationPairs(): array
+    {
+        $cases = [];
+        foreach (['initial', 'correct', 'duk'] as $kind) {
+            foreach ([false, true] as $historyFirst) {
+                $cases[$kind.'-'.(int) $historyFirst] = [$kind, $historyFirst];
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('coordinationPairs')]
+    public function test_history_serializes_with_evaluation_and_duk_writers(string $kind, bool $historyFirst): void
+    {
+        $this->coordinationPermissions();
+        $other = match ($kind) {
+            'initial' => ['operation' => 'initial', 'person' => $this->person->id, 'source' => $this->source()],
+            'correct' => $this->correctionInput($this->initial(), 'CUKUP'),
+            'duk' => ['operation' => 'duk', 'batch_id' => $this->preparedDuk($this->actor, [$this->dukPersonRow($this->person->person_key, $this->person->nip, 'Updated')])->id],
+        };
+        $pair = [$this->historyInput(), $other];
+        if (! $historyFirst) {
+            $pair = array_reverse($pair);
+        }
+        $results = $this->pair($pair[0], $pair[1], 'hold', 'people');
+        $this->assertSame([true, true], array_column($results, 'success'));
+        $this->assertSame(1, EmployeePositionHistory::count());
+        $this->assertSame(1, PakEvent::where('event_code', 'HISTORY_VERIFIED')->count());
+        if ($kind === 'correct') {
+            $this->assertSame(2, PerformanceEvaluation::count());
+            $this->assertSame(1, PakEvent::where('event_code', 'PERFORMANCE_EVALUATION_CORRECTED')->count());
+        }
+        if ($kind !== 'duk') {
+            $this->assertSame(1, PerformanceEvaluation::where('status', 'CURRENT')->count());
+        } else {
+            $this->assertSame('committed', ImportBatch::findOrFail($other['batch_id'])->status);
+            $this->assertSame('Updated', $this->person->fresh()->canonical_name);
+        }
+        $this->assertSame(0, PakConversionRun::count());
+        $this->assertSame(0, PakEvent::where('event_code', 'like', 'CONVERSION_RUN_%')->count());
+    }
+
+    public function test_reversed_duk_workbooks_coordinate_existing_people_and_keep_new_identities(): void
+    {
+        $this->coordinationPermissions();
+        $other = Person::factory()->create();
+        $a = $this->dukPersonRow($this->person->person_key, $this->person->nip, 'A');
+        $b = $this->dukPersonRow($other->person_key, $other->nip, 'B');
+        $new = $this->dukPersonRow(hash('sha256', 'new-person'), null, 'New');
+        $first = $this->preparedDuk($this->actor, [$b, $a, $new], '2026-09-01');
+        $second = $this->preparedDuk($this->actor, [$a, $b], '2026-10-01');
+        $results = $this->pair(['operation' => 'duk', 'batch_id' => $first->id], ['operation' => 'duk', 'batch_id' => $second->id], 'hold', 'people');
+        $this->assertSame([true, true], array_column($results, 'success'));
+        $this->assertSame(3, Person::count());
+        $this->assertSame(5, PersonnelSnapshot::count());
+        $this->assertSame(['B', 'A', 'New'], PersonnelSnapshot::where('import_batch_id', $first->id)->orderBy('id')->pluck('name_at_period')->all());
+        $this->assertSame(['A', 'B'], PersonnelSnapshot::where('import_batch_id', $second->id)->orderBy('id')->pluck('name_at_period')->all());
+        $this->assertSame('committed', $first->fresh()->status);
+        $this->assertSame('committed', $second->fresh()->status);
+        $this->assertSame(0, PakEvent::count());
+    }
+
+    public static function dukReaders(): array
+    {
+        return [['commit', false], ['commit', true], ['case', false], ['case', true]];
+    }
+
+    #[DataProvider('dukReaders')]
+    public function test_duk_serializes_with_skp_commit_or_case_capture(string $kind, bool $dukFirst): void
+    {
+        $this->coordinationPermissions();
+        $originalName = $this->person->canonical_name;
+        $duk = ['operation' => 'duk', 'batch_id' => $this->preparedDuk($this->actor, [$this->dukPersonRow($this->person->person_key, $this->person->nip, 'Updated')])->id];
+        $other = $kind === 'commit' ? $this->commitInput($this->prepare()) : ['operation' => 'case', 'case' => [
+            'person_id' => $this->person->id, 'purpose_type' => 'KP', 'period_start' => '2025-01-01', 'period_end' => '2025-12-31', 'employee_data_as_of' => '2025-12-31', 'pak_rule_set_id' => null]];
+        $pair = $dukFirst ? [$duk, $other] : [$other, $duk];
+        $results = $this->pair($pair[0], $pair[1], 'hold', 'people');
+        $this->assertSame([true, true], array_column($results, 'success'));
+        $this->assertSame('committed', ImportBatch::findOrFail($duk['batch_id'])->status);
+        if ($kind === 'commit') {
+            $this->committed(PakSkpImportBatch::findOrFail($other['batch_id']));
+            $this->assertSame(1, PerformanceEvaluation::count());
+            $this->assertSame(1, PakEvent::where('event_code', 'SKP_IMPORT_COMMITTED')->count());
+        } else {
+            $case = PakCase::sole();
+            $this->assertSame($dukFirst ? 'Updated' : $originalName, $case->employeeSnapshot->name);
+            $this->assertSame(1, PakEvent::where('event_code', 'PAK_CASE_CREATED')->count());
+        }
+        $this->assertSame(0, PakConversionRun::count());
+    }
+
+    public static function masterReaders(): array
+    {
+        return [['history', false], ['history', true], ['case', false], ['case', true]];
+    }
+
+    #[DataProvider('masterReaders')]
+    public function test_shared_master_writer_serializes_with_history_and_capture(string $kind, bool $masterFirst): void
+    {
+        $this->coordinationPermissions();
+        $category = FunctionalCategory::create(['code' => 'SYNTH', 'name' => 'Synthetic', 'sort_order' => 1, 'is_active' => true]);
+        $level = FunctionalLevel::create(['code' => 'SYNTH', 'name' => 'Original', 'functional_category_id' => $category->id, 'sort_order' => 1, 'is_active' => true]);
+        $position = FunctionalPosition::create(['code' => 'SYNTH', 'name' => 'Synthetic', 'is_active' => true]);
+        FunctionalPositionLevel::create(['functional_position_id' => $position->id, 'functional_level_id' => $level->id, 'is_active' => true]);
+        $history = $this->historyInput();
+        $history['history'] = array_replace($history['history'], ['position_type' => 'JF', 'functional_position_id' => $position->id, 'functional_level_id' => $level->id]);
+        if ($kind === 'case') {
+            app(EmployeeHistoryService::class)->record($this->actor, $this->person, $history['history'], true);
+            $reader = ['operation' => 'case', 'case' => ['person_id' => $this->person->id, 'purpose_type' => 'KP', 'period_start' => '2025-01-01', 'period_end' => '2025-12-31', 'employee_data_as_of' => '2025-12-31', 'pak_rule_set_id' => null]];
+        } else {
+            $reader = $history;
+        }
+        $master = ['operation' => 'master', 'type' => 'level', 'master_id' => $level->id, 'master' => ['code' => 'SYNTH', 'name' => 'Updated', 'functional_category_id' => $category->id, 'sort_order' => 1, 'is_active' => true]];
+        $pair = $masterFirst ? [$master, $reader] : [$reader, $master];
+        $results = $this->pair($pair[0], $pair[1], 'hold', 'functional_levels');
+        $this->assertSame([true, true], array_column($results, 'success'));
+        $this->assertSame('Updated', $level->fresh()->name);
+        $this->assertSame(1, EmployeePositionHistory::count());
+        $this->assertSame(1, PakEvent::where('event_code', 'MASTER_SAVED')->count());
+        if ($kind === 'case') {
+            $this->assertSame($masterFirst ? 'Updated' : 'Original', PakCase::sole()->employeeSnapshot->functional_level_name);
+        }
+    }
+
+    public function test_different_people_without_shared_master_are_independent(): void
+    {
+        $this->coordinationPermissions();
+        $other = Person::factory()->create();
+        $results = $this->pair($this->historyInput(), $this->historyInput($other), 'independent', 'people');
+        $this->assertSame([true, true], array_column($results, 'success'));
+        $this->assertSame(2, EmployeePositionHistory::count());
+        $this->assertSame(2, PakEvent::where('event_code', 'HISTORY_VERIFIED')->count());
     }
 
     private function committed(PakSkpImportBatch $batch): void
@@ -253,6 +423,38 @@ class SkpImportConcurrencyTest extends TestCase
             $connection->rollBack();
             DB::purge('skp_competitor');
         }
+    }
+
+    public function test_history_validation_uses_current_state_after_an_older_repeatable_read_snapshot(): void
+    {
+        $this->coordinationPermissions();
+        $connection = DB::connection();
+        $name = DB::getDefaultConnection();
+        config(['database.connections.history_competitor' => array_diff_key($connection->getConfig(), ['name' => true])]);
+        $input = $this->historyInput()['history'];
+        $connection->beginTransaction();
+        try {
+            $this->assertSame('REPEATABLE-READ', $connection->selectOne('SELECT @@tx_isolation AS v')->v);
+            $this->assertSame(0, EmployeePositionHistory::count());
+            $parentId = (int) $connection->selectOne('SELECT CONNECTION_ID() AS id')->id;
+            DB::setDefaultConnection('history_competitor');
+            $this->assertNotSame($parentId, (int) DB::selectOne('SELECT CONNECTION_ID() AS id')->id);
+            app(EmployeeHistoryService::class)->record($this->actor, $this->person, $input, true);
+            DB::setDefaultConnection($name);
+            $this->assertSame(0, EmployeePositionHistory::count(), 'Old snapshot deliberately remains');
+            try {
+                app(EmployeeHistoryService::class)->record($this->actor, $this->person, $input, true);
+                $this->fail('Current overlap must reject, despite earlier empty snapshot');
+            } catch (ValidationException $e) {
+                $this->assertArrayHasKey('tmt_start', $e->errors());
+            }
+        } finally {
+            DB::setDefaultConnection($name);
+            $connection->rollBack();
+            DB::purge('history_competitor');
+        }
+        $this->assertSame(1, EmployeePositionHistory::count());
+        $this->assertSame(1, PakEvent::where('event_code', 'HISTORY_VERIFIED')->count());
     }
 
     public function test_real_current_unique_error_shape_from_concurrent_initial_creation(): void

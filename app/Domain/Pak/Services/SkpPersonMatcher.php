@@ -5,10 +5,22 @@ namespace App\Domain\Pak\Services;
 use App\Domain\Pak\DTOs\SkpPersonResolution;
 use App\Domain\Pak\Enums\SkpPersonResolutionStatus;
 use App\Models\Person;
+use Illuminate\Database\Eloquent\Collection;
 
 class SkpPersonMatcher
 {
+    /** The caller supplies freshly locked Persons, never a browser-selected replacement identity. */
+    public function matchCoordinated(mixed $nip, Collection $people): SkpPersonResolution
+    {
+        return $this->resolve($nip, fn ($normalized) => $people->filter(fn (Person $p) => $p->nip === $normalized)->modelKeys());
+    }
+
     public function match(mixed $nip): SkpPersonResolution
+    {
+        return $this->resolve($nip, fn ($normalized) => $this->candidateIds($normalized));
+    }
+
+    private function resolve(mixed $nip, callable $candidatesFor): SkpPersonResolution
     {
         if (! is_string($nip) || ! mb_check_encoding($nip, 'UTF-8')) {
             return SkpPersonResolution::unresolved(SkpPersonResolutionStatus::INVALID, null);
@@ -18,7 +30,7 @@ class SkpPersonMatcher
         if (! preg_match('/\A[0-9]{18}\z/', $normalized)) {
             return SkpPersonResolution::unresolved(SkpPersonResolutionStatus::INVALID, $normalized);
         }
-        $candidates = $this->candidateIds($normalized);
+        $candidates = array_values($candidatesFor($normalized));
 
         return match (count($candidates)) {
             0 => SkpPersonResolution::unresolved(SkpPersonResolutionStatus::NOT_FOUND, $normalized),

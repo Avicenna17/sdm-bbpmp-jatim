@@ -590,26 +590,50 @@ class PerformanceEvaluationServiceTest extends TestCase
 
     public function test_predecessor_query_is_locked_inside_transaction(): void
     {
-        $old = $this->service->createInitial($this->actor, $this->record());
+        $history = $this->history($this->person);
+        $old = $this->service->createInitial($this->actor, $this->record(), $history->id);
         $proposed = $this->record(['predicate_code' => 'CUKUP']);
         $row = $this->evidence($proposed);
         $level = DB::transactionLevel();
         $locks = 0;
+        $personLocked = false;
+        $historyLocks = 0;
         $scopes = PerformanceEvaluation::getAllGlobalScopes();
-        PerformanceEvaluation::addGlobalScope('observe-correction-lock', function ($builder) use ($level, &$locks) {
-            $builder->getQuery()->beforeQuery(function ($query) use ($level, &$locks) {
+        Person::addGlobalScope('observe-person-lock', function ($builder) use (&$personLocked) {
+            $builder->getQuery()->beforeQuery(function ($query) use (&$personLocked) {
                 if ($query->lock === true) {
+                    $personLocked = true;
+                }
+            });
+        });
+        PerformanceEvaluation::addGlobalScope('observe-correction-lock', function ($builder) use ($level, &$locks, &$personLocked, &$historyLocks) {
+            $builder->getQuery()->beforeQuery(function ($query) use ($level, &$locks, &$personLocked, &$historyLocks) {
+                if ($query->lock !== null) {
+                    $this->assertSame(0, $historyLocks, 'No model-owned evaluation lock after history validation');
+                }
+                if ($query->lock === true) {
+                    $this->assertTrue($personLocked);
                     $this->assertGreaterThan($level, DB::transactionLevel());
                     $locks++;
                 }
             });
         });
+        EmployeePositionHistory::addGlobalScope('observe-history-lock', function ($builder) use (&$locks, &$historyLocks) {
+            $builder->getQuery()->beforeQuery(function ($query) use (&$locks, &$historyLocks) {
+                if ($query->lock !== null) {
+                    $this->assertSame(1, $locks, 'Original predecessor locked before history validation');
+                    $this->assertFalse($query->lock);
+                    $historyLocks++;
+                }
+            });
+        });
         try {
-            $this->service->correct($this->actor, $old->id, $proposed, 'Correction', $row->id);
+            $this->service->correct($this->actor, $old->id, $proposed, 'Correction', $row->id, $history->id);
         } finally {
             PerformanceEvaluation::setAllGlobalScopes($scopes);
         }
         $this->assertSame(1, $locks);
+        $this->assertSame(1, $historyLocks, 'Only service validation acquires a history lock');
     }
 
     private function history(Person $person): EmployeePositionHistory

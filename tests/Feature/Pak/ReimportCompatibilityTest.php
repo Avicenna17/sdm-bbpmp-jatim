@@ -13,9 +13,12 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Tests\Support\DatabaseWithoutWrappingTransaction;
 
 class ReimportCompatibilityTest extends PakTestCase
 {
+    use DatabaseWithoutWrappingTransaction;
+
     public function test_real_duk_reimport_keeps_person_case_and_saved_snapshot(): void
     {
         Storage::fake('local');

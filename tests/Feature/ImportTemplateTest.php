@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Domain\Import\ImportService;
 use App\Domain\Import\WorkbookParser;
+use App\Domain\Templates\TemplateSampleLoader;
 use App\Domain\Templates\TemplateService;
 use App\Filament\Pages\Templates;
 use App\Models\ImportTemplate;
+use App\Models\ImportTemplateVersion;
 use App\Models\PersonnelSnapshot;
 use App\Models\ReportingPeriod;
 use App\Models\User;
@@ -17,13 +19,15 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Tests\Support\DatabaseWithoutWrappingTransaction;
 use Tests\TestCase;
 
 class ImportTemplateTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\DatabaseWithoutWrappingTransaction { DatabaseWithoutWrappingTransaction::refreshDatabase insteadof RefreshDatabase; }
 
     private User $admin;
 
@@ -187,7 +191,7 @@ class ImportTemplateTest extends TestCase
             }
         }
         $page->call('save')->assertHasNoErrors();
-        $stored = \App\Models\ImportTemplateVersion::findOrFail($page->get('draftId'));
+        $stored = ImportTemplateVersion::findOrFail($page->get('draftId'));
         foreach ($stored->definition['columns'] as $column) {
             if (in_array($column['key'], ['name_at_period', 'employment_status'])) {
                 $this->assertTrue($column['required']);
@@ -301,7 +305,7 @@ class ImportTemplateTest extends TestCase
         $path = tempnam(sys_get_temp_dir(), 'export');
         try {
             file_put_contents($path, $response->streamedContent());
-            $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+            $book = IOFactory::load($path);
             $this->assertSame($version->definition['title'], $book->getActiveSheet()->getCell('A1')->getValue());
             $this->assertSame($period->label, $book->getActiveSheet()->getCell('A2')->getValue());
             $this->assertSame('Pegawai Contoh', $book->getActiveSheet()->getCell('C4')->getValue());
@@ -318,7 +322,7 @@ class ImportTemplateTest extends TestCase
         $path = tempnam(sys_get_temp_dir(), 'sample');
         try {
             (new Xlsx($book))->save($path);
-            $loaded = app(\App\Domain\Templates\TemplateSampleLoader::class)->load($path, WorkbookParser::PERSONNEL, $version->id);
+            $loaded = app(TemplateSampleLoader::class)->load($path, WorkbookParser::PERSONNEL, $version->id);
             $this->assertSame([], $loaded['samples']);
             $this->assertSame(0, $loaded['rows']);
             $this->assertSame($version->definition['title'], $loaded['definition']['title']);
@@ -339,7 +343,7 @@ class ImportTemplateTest extends TestCase
             $path = tempnam(sys_get_temp_dir(), 'structure');
             try {
                 (new Xlsx($book))->save($path);
-                $result = app(\App\Domain\Templates\TemplateSampleLoader::class)->load($path, $source, $version->id);
+                $result = app(TemplateSampleLoader::class)->load($path, $source, $version->id);
                 $this->assertCount($source === WorkbookParser::PERSONNEL ? 2 : 3, $result['definition']['columns']);
                 $this->assertSame(1, $result['rows']);
             } finally {
@@ -357,7 +361,7 @@ class ImportTemplateTest extends TestCase
         }
         foreach ($paths as $source => $path) {
             $version = ImportTemplate::where('source', $source)->firstOrFail()->activeVersion;
-            $result = app(\App\Domain\Templates\TemplateSampleLoader::class)->load($path, $source, $version->id);
+            $result = app(TemplateSampleLoader::class)->load($path, $source, $version->id);
             $this->assertCount($source === WorkbookParser::PERSONNEL ? 6 : 9, $result['definition']['columns']);
             $this->assertGreaterThan(0, $result['rows']);
             $this->assertNotEmpty($result['samples']);

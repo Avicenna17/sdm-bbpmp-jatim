@@ -7,20 +7,44 @@ use App\Domain\Pak\DTOs\EmployeeSnapshotData;
 use App\Domain\Pak\DTOs\HistoricalOrganizationContext;
 use App\Domain\Pak\Queries\EmployeeHistoryQuery;
 use App\Domain\Pak\Queries\EmployeeReferenceQuery;
+use App\Models\FunctionalCategory;
+use App\Models\FunctionalLevel;
+use App\Models\FunctionalPosition;
 use App\Models\Person;
 use App\Models\User;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 final class EmployeeSnapshotService
 {
-    public function build(User $actor, Person $person, string $asOf, ?int $dukId = null, ?array $organization = null): EmployeeSnapshotData
+    public function build(User $actor, Person $person, string $asOf, ?int $dukId = null, ?array $organization = null, bool $current = false): EmployeeSnapshotData
     {
         Access::authorize($actor, 'pak.employee.view');
-        $person->refresh();
-        $duk = $dukId ? app(EmployeeReferenceQuery::class)->find($actor, $dukId, $person->id, $asOf)->toArray() : null;
-        $profile = $person->employeeProfile()->whereNotNull('verified_at')->first();
-        $rank = app(EmployeeHistoryQuery::class)->at($person->id, $asOf);
+        if ($current && DB::transactionLevel() === 0) {
+            throw new \LogicException('Authoritative capture requires coordinated transaction.');
+        }
+        $person = $current ? Person::sharedLock()->findOrFail($person->id) : $person->fresh();
+        $duk = $dukId ? app(EmployeeReferenceQuery::class)->find($actor, $dukId, $person->id, $asOf, current: $current)->toArray() : null;
+        $profile = $person->employeeProfile()->whereNotNull('verified_at')->when($current, fn ($q) => $q->sharedLock())->first();
+        // Discovery is not authoritative: master rows must precede locking history reads.
         $position = app(EmployeeHistoryQuery::class)->at($person->id, $asOf, true);
+        if ($current) {
+            $masters = app(SharedMasterLocks::class)->acquire(positionIds: [$position?->functional_position_id], levelIds: [$position?->functional_level_id]);
+            $position = app(EmployeeHistoryQuery::class)->at($person->id, $asOf, true, true);
+            foreach (['functional_position_id' => FunctionalPosition::class, 'functional_level_id' => FunctionalLevel::class] as $field => $class) {
+                if ($position?->$field !== null && ! isset($masters[$class][$position->$field])) {
+                    throw ValidationException::withMessages(['snapshot' => 'Sumber berubah sejak discovery. Tinjau ulang.']);
+                }
+            }
+            if ($position) {
+                $level = $masters[FunctionalLevel::class][$position->functional_level_id] ?? null;
+                $level?->setRelation('category', $masters[FunctionalCategory::class][$level->functional_category_id] ?? null);
+                $position->setRelation('functionalPosition', $masters[FunctionalPosition::class][$position->functional_position_id] ?? null);
+                $position->setRelation('functionalLevel', $level);
+            }
+        }
+        $rank = app(EmployeeHistoryQuery::class)->at($person->id, $asOf, false, $current);
         $org = HistoricalOrganizationContext::from($organization, $asOf)->values;
         $fields = ['karpeg_number', 'birth_place', 'birth_date', 'gender'];
         $data = ['name' => $duk['name_at_period'] ?? $person->canonical_name, 'nip' => $duk ? $duk['nip_at_period'] : $person->nip];

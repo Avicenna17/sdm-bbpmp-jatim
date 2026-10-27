@@ -14,6 +14,7 @@ use App\Models\EmployeePositionHistory;
 use App\Models\PakSkpImportRow;
 use App\Models\PerformanceEvaluation;
 use App\Models\User;
+use App\Support\Database\PersonLocks;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -32,6 +33,7 @@ final class PerformanceEvaluationService
         $attributes = $this->attributes($record);
 
         return DB::transaction(function () use ($actor, $record, $attributes, $historyId) {
+            PersonLocks::acquire([$record->person_id]);
             $this->validateHistory($historyId, $record->person_id);
 
             // No read-before-create dedup or collision translation. The unique index remains authoritative.
@@ -70,7 +72,13 @@ final class PerformanceEvaluationService
     {
         // Each attempt reloads the original target and provenance in a fresh top-level transaction.
         return DB::transaction(function () use ($actor, $predecessorId, $proposed, $revisionReason, $sourceRowId, $historyId) {
+            // Routing only. The original predecessor is reloaded/current-validated after Person.
+            $personId = PerformanceEvaluation::query()->findOrFail($predecessorId)->person_id;
+            PersonLocks::acquire([$personId]);
             $previous = PerformanceEvaluation::query()->lockForUpdate()->findOrFail($predecessorId);
+            if ((int) $previous->person_id !== (int) $personId) {
+                $this->reject('SOURCE_IDENTITY_CHANGE_NOT_ALLOWED');
+            }
             if ($previous->status !== PerformanceEvaluationStatus::CURRENT) {
                 $this->reject('PREDECESSOR_NOT_CURRENT');
             }
@@ -90,7 +98,7 @@ final class PerformanceEvaluationService
                 $this->reject('NO_CHANGES');
             }
             $this->validateHistory($historyId, $proposed->person_id);
-            $sourceRow = PakSkpImportRow::query()->useWritePdo()->findOrFail($sourceRowId);
+            $sourceRow = PakSkpImportRow::query()->sharedLock()->findOrFail($sourceRowId);
             $this->validateProvenance($sourceRow, $proposed, $attributes);
 
             $previous->update(['status' => PerformanceEvaluationStatus::SUPERSEDED,
@@ -124,7 +132,7 @@ final class PerformanceEvaluationService
 
     private function validateHistory(?int $historyId, int $personId): void
     {
-        if ($historyId !== null && ! EmployeePositionHistory::query()->whereKey($historyId)->where('person_id', $personId)->exists()) {
+        if ($historyId !== null && EmployeePositionHistory::query()->whereKey($historyId)->where('person_id', $personId)->sharedLock()->first() === null) {
             throw ValidationException::withMessages(['employee_position_history_id' => 'Histori harus milik person yang sama.']);
         }
     }

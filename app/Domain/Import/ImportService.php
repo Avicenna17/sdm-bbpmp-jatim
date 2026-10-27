@@ -10,6 +10,7 @@ use App\Models\PositionDataset;
 use App\Models\PositionRequirementSnapshot;
 use App\Models\ReportingPeriod;
 use App\Models\User;
+use App\Support\Database\PersonLocks;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -127,15 +128,65 @@ class ImportService
 
     public function commit(User $user, ImportBatch $batch): void
     {
+        if (DB::transactionLevel() !== 0) {
+            throw ValidationException::withMessages(['import' => 'COMMIT_REQUIRES_TOP_LEVEL_TRANSACTION']);
+        }
         Gate::forUser($user)->authorize('import.commit');
         try {
-            DB::transaction(function () use ($batch, $user) {
+            $batch = ImportBatch::findOrFail($batch->id);
+            if ($batch->status === 'committed') {
+                return;
+            }
+            if ($batch->status !== 'validated' || $batch->error_rows > 0) {
+                throw ValidationException::withMessages(['import' => 'Import mengandung error atau belum tervalidasi.']);
+            }
+            if ($batch->source_type === WorkbookParser::PERSONNEL && ($batch->summary['source_policy'] ?? null) !== 'duk-only-v1') {
+                throw ValidationException::withMessages(['import' => 'Hasil pemeriksaan ini memakai aturan lama. Pilih Periksa ulang file, lalu simpan hasil pemeriksaan terbaru.']);
+            }
+            if ($batch->source_type === WorkbookParser::POSITION && ($batch->summary['position_policy'] ?? null) !== 'global-v1') {
+                throw ValidationException::withMessages(['import' => 'Preview Peta Jabatan memakai aturan periode lama. Periksa ulang file sebelum menyimpan.']);
+            }
+            // Parse a private copy of the exact bytes accepted by SHA-256, before locks.
+            $prepared = $batch->getAttributes();
+            $bytes = Storage::disk($batch->disk)->get($batch->path);
+            if ($bytes === null || ! hash_equals($batch->sha256, hash('sha256', $bytes))) {
+                throw ValidationException::withMessages(['import' => 'Checksum file berubah. Upload ulang.']);
+            }
+            $copy = tmpfile();
+            if ($copy === false) {
+                throw ValidationException::withMessages(['import' => 'File sumber gagal dipersiapkan. Periksa ulang.']);
+            }
+            try {
+                if (fwrite($copy, $bytes) !== strlen($bytes) || ! fflush($copy)) {
+                    throw ValidationException::withMessages(['import' => 'File sumber gagal dipersiapkan. Periksa ulang.']);
+                }
+                $parsed = $this->parser->parse(stream_get_meta_data($copy)['uri'], $batch->source_type,
+                    $batch->summary['requested_template_version_id'] ?? $batch->template_version_id,
+                    $batch->summary['mapping_overrides'] ?? [], $batch->summary['ignored_columns'] ?? []);
+                $rows = $parsed['rows'];
+                if (collect($parsed['issues'])->contains('severity', 'ERROR') || $rows !== $this->rows($batch)) {
+                    throw ValidationException::withMessages(['import' => 'Hasil pemeriksaan tidak sesuai file sumber. Periksa ulang.']);
+                }
+            } catch (ValidationException $e) {
+                throw $e;
+            } catch (\Throwable) {
+                throw ValidationException::withMessages(['import' => 'File sumber gagal dibaca. Periksa ulang.']);
+            } finally {
+                fclose($copy);
+            }
+            if (! $rows) {
+                throw ValidationException::withMessages(['import' => 'Snapshot kosong ditolak.']);
+            }
+            DB::transaction(function () use ($batch, $user, $prepared, $rows) {
                 $period = $batch->source_type === WorkbookParser::POSITION
                     ? PositionDataset::lockForUpdate()->findOrFail(1)
                     : ReportingPeriod::lockForUpdate()->findOrFail($batch->reporting_period_id);
                 $batch = ImportBatch::lockForUpdate()->findOrFail($batch->id);
                 if ($batch->status === 'committed') {
                     return;
+                }
+                if ($batch->getAttributes() !== $prepared) {
+                    throw ValidationException::withMessages(['import' => 'Data sumber ini berubah sejak persiapan. Muat ulang.']);
                 }
                 if ($batch->status !== 'validated' || $batch->error_rows > 0) {
                     throw ValidationException::withMessages(['import' => 'Import mengandung error atau belum tervalidasi.']);
@@ -152,17 +203,22 @@ class ImportService
                 if ($batch->source_type === WorkbookParser::PERSONNEL && $period->status === 'published') {
                     Gate::forUser($user)->authorize('period.revise');
                 }
-                if (! hash_equals($batch->sha256, hash_file('sha256', Storage::disk($batch->disk)->path($batch->path)))) {
-                    throw ValidationException::withMessages(['import' => 'Checksum file berubah. Upload ulang.']);
-                }
-                $rows = $this->rows($batch);
-                if (! $rows) {
-                    throw ValidationException::withMessages(['import' => 'Snapshot kosong ditolak.']);
-                }
                 if ($batch->source_type === WorkbookParser::PERSONNEL) {
+                    $keys = array_column($rows, 'person_key');
+                    $discovered = Person::whereIn('person_key', $keys)->pluck('person_key', 'id');
+                    $ids = array_merge($discovered->keys()->all(), $period->personnel()->pluck('person_id')->all());
+                    $people = PersonLocks::acquire($ids);
+                    foreach ($discovered as $id => $key) {
+                        if ($people[$id]->person_key !== $key) {
+                            throw ValidationException::withMessages(['import' => 'Identitas sumber berubah. Muat ulang.']);
+                        }
+                    }
+                    $byKey = $people->keyBy('person_key');
                     $period->personnel()->delete();
                     foreach ($rows as $row) {
-                        $person = Person::updateOrCreate(['person_key' => $row['person_key']], ['nip' => $row['nip_at_period'], 'canonical_name' => $row['name_at_period'], 'normalized_name' => $row['normalized_name']]);
+                        $person = $byKey->get($row['person_key']) ?? new Person(['person_key' => $row['person_key']]);
+                        $person->fill(['nip' => $row['nip_at_period'], 'canonical_name' => $row['name_at_period'], 'normalized_name' => $row['normalized_name']])->save();
+                        $byKey->put($row['person_key'], $person);
                         unset($row['person_key'],$row['normalized_name']);
                         PersonnelSnapshot::create($row + ['person_id' => $person->id, 'reporting_period_id' => $period->id, 'import_batch_id' => $batch->id]);
                     }
