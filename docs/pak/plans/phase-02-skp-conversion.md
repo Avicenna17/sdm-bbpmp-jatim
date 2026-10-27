@@ -268,13 +268,14 @@ Minimal kode:
 | `ANNUAL_SUBSET_REQUIRES_REVIEW` | Kode historis desain; tidak diterbitkan untuk annual subset yang sah menurut BR-SKP-002 |
 | `PARTIAL_MONTH_REQUIRES_REVIEW` | Requested range parsial di luar keputusan TMT; tidak berlaku hanya karena TMT tengah/akhir bulan |
 | `RULE_VALIDITY_REQUIRES_REVIEW` | Safe diagnostics boleh ditampilkan pada preview tanpa kalkulasi numerik untuk seluruh request; exact total NULL. Authoritative diagnostic save sebagai REQUIRES_REVIEW hanya jika seluruh save gate lainnya berhasil. |
+| `LEGACY_REGIME_REQUIRES_REVIEW` | Authoritative TMT Jabatan SK < 2023-01-01 evidence: affected line non-numeric, exact line result/complete total NULL; conditional diagnostic save; stop current-regime child lookup. Detail mengikuti OD-12 Phase 02C. |
 | `MISSING_POSITION_HISTORY` | Segment terdampak tidak dihitung |
 | `AMBIGUOUS_POSITION_HISTORY` | Segment terdampak tidak dihitung |
 | `PREDICATE_RULE_NOT_FOUND` | Setelah validity lolos, exact predicate code tidak memiliki matching child rule; line terdampak diagnostic, complete total NULL |
 | `COEFFICIENT_RULE_NOT_FOUND` | Setelah validity lolos, canonical functional_level_id tersedia tetapi exact coefficient rule tidak ditemukan; line terdampak diagnostic, complete total NULL |
 | `MISSING_FUNCTIONAL_LEVEL` | Position resolution sukses, tetapi selected authoritative position tidak menyediakan canonical functional_level_id untuk coefficient lookup; line terdampak diagnostic, complete total NULL. Gap/overlap tetap memakai position issue codes. |
 
-Validity gate, precedence yang short-circuit child numeric resolution, dan outcome mengikuti [OD-11 RESOLVED dalam plan Phase 02C](phase-02c-resolution-conversion-runs.md#od-11--resolved-rule-validity-dan-child-resolvability); executable acceptance dimiliki 02C.5/TC-PAK-042. Ketentuan tersebut menjadi acuan authoritative untuk rule validity pada parent plan ini.
+Validity gate, precedence yang short-circuit child numeric resolution, dan outcome mengikuti [OD-11 RESOLVED dalam plan Phase 02C](phase-02c-resolution-conversion-runs.md#od-11--resolved-rule-validity-dan-child-resolvability); executable acceptance dimiliki 02C.5/TC-PAK-042. Ketentuan tersebut menjadi acuan authoritative untuk rule validity pada parent plan ini. [OD-12](phase-02c-resolution-conversion-runs.md#od-12--resolved-canonical-legacy-review-outcome) menambahkan canonical LEGACY outcome berdasarkan bukti TMT Jabatan SK, bukan labels atau automatic history.tmt_start equivalence; LEGACY tidak diterjemahkan menjadi missing rule/level karena current-rule lookup sengaja dilewati.
 
 Tambahkan kode teknis `SOURCE_COVERAGE_GAP`, `SOURCE_CHANGED_REQUIRES_REVIEW`, dan `CASE_CONTEXT_CHANGED_REQUIRES_REVIEW`.
 
