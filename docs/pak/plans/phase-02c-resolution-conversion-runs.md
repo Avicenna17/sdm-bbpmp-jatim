@@ -838,6 +838,10 @@ BR-KONV-004 tetap APPROVED. PREVIEW_ONLY adalah lifecycle boundary Phase 02.
 
 Tidak memasukkan AK Dasar, Integrasi, old conversion, atau cumulative 175. Tidak membuat mapping JF Nurmaulida.
 
+**Fixture ownership 02C.5.2.A:** TC-PAK-001/037 Nurmaulida tetap numeric-only business Golden untuk exact lines `25/6`, `25/1`, `25/1`, `125/6` dan total `75/1`: exact arithmetic, no rounded-line summation, presentation separation, no AK Dasar double counting. Fixture itu bukan bukti SK/TMT Jabatan SK, real history/provenance, OD-04 continuity, OD-13 evidence, atau actual position/level mapping; verified mapping tetap pending dan tidak boleh dilengkapi dengan documentary evidence rekaan.
+
+Preview integration memakai fixture terpisah yang eksplisit synthetic/non-real: synthetic person/case, verified non-superseded OD-04-compatible histories, OD-13-complete synthetic SK number/reference dan accepted tmt_start, position/level mappings, evaluations, rule set/children serta dependencies sesuai accepted contracts. Fixture tersebut boleh mereproduksi empat exact lines dan total `75/1` untuk menguji orchestration OD-03/source/OD-04/OD-13/regime/child rules/calculator/manifest/fingerprint. Itu hanya integration arithmetic expectation, bukan factual Nurmaulida/real-employee evidence. Jangan melemahkan OD-13 atau mengubah original numeric Golden. Rincian ownership berada pada [TC-PAK-037](../test-cases.md#tc-pak-037--golden-nurmaulida-numeric-only); tidak menambah business rule/OD atau memperluas scope preview.
+
 Fixtures tambahan:
 
 - Annual wins.

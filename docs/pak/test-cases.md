@@ -885,6 +885,14 @@ Ulangi TMT baru 1 Oktober dan 31 Oktober: hasil sama. Tambahkan perubahan lain k
 
 **Rules:** BR-KONV-003/004/005. Expected raw Nov–Dec 2023 = 25/6, 2024 = 25, 2025 = 25, Jan–Oct 2026 = 125/6; jumlah eksak 75, output 75. Detail display 4,167; 25; 25; 20,833. Tidak menggunakan display sebagai operand total. Jangan menambahkan mapping JF fiktif untuk koefisien 25; bila dasar mapping resmi belum terbukti, test hanya fixture numerik, bukan bukti production resolution.
 
+### Fixture ownership untuk Phase 02C.5.2.A
+
+TC-PAK-001/TC-PAK-037 tetap numeric Golden Nurmaulida: Nov–Dec 2023 = `25/6`, 2024 = `25/1`, 2025 = `25/1`, Jan–Oct 2026 = `125/6`, complete exact conversion total `75/1`. Fixture ini membuktikan exact arithmetic, no rounded-line summation, rounding/presentation separation, dan no AK Dasar double counting. Ia tidak membuktikan documentary SK identity, TMT Jabatan SK, real EmployeePositionHistory provenance, OD-04 continuity, OD-13 evidence, atau actual functional-position/functional-level mapping Nurmaulida. Verified mapping tetap pending; jangan retrofit invented SK, position, level, history, atau provenance ke numeric Golden.
+
+02C.5.2.A boleh memakai **fixture preview integration terpisah yang seluruhnya eksplisit synthetic/test data**, bukan factual evidence Nurmaulida atau pegawai nyata mana pun. Fixture ini boleh memuat synthetic person/case, verified/non-superseded histories dengan continuity OD-04, documentary-complete OD-13 fields (termasuk synthetic sk_number, source_ref/documentary reference dan tmt_start yang memenuhi contract), functional position/level mappings, evaluations, rule set/child rules, serta dependency lain yang diperlukan accepted contracts.
+
+Ownership synthetic fixture adalah orchestration integration: OD-03 → source → OD-04 → OD-13 → regime → child rules → calculator → manifest/fingerprint. Fixture boleh sengaja menghasilkan exact lines `25/6`, `25/1`, `25/1`, `125/6` dan total `75/1`. Kesamaan angka hanya integration arithmetic expectation; tidak menjadikannya Nurmaulida evidence atau bukti real-world documentary provenance. Original Nurmaulida Golden tetap numeric business regression. Jangan melemahkan OD-13 agar numeric-only Golden dapat dipaksakan melalui preview. Klarifikasi ownership ini bukan business rule baru dan bukan klaim executable preview tests sudah tersedia.
+
 ## TC-PAK-038 — Personnel provenance dan guidance
 
 **Rules:** BR-DATA-001, BR-REF-001. Requirement dokumen resmi mencakup KARPEG, tempat/tanggal lahir, TMT pangkat/gol, dan TMT jabatan -> SK dengan provenance. Default unit/instansi harus berlabel default client, tidak otomatis menjadi bukti historis. Tabel perpindahan/target KP/KJ yang tersedia sebagai guidance tidak mengaktifkan calculator fase berikutnya atau mengubah hasil Phase 02. Checkpoint ini tidak mengubah importer, schema, atau UI executable.
