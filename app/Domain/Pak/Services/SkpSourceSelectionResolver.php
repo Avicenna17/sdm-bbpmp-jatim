@@ -9,23 +9,26 @@ use App\Domain\Pak\DTOs\SkpSourceSelection;
 use App\Domain\Pak\Enums\PerformanceEvaluationStatus;
 use App\Domain\Pak\Enums\PerformanceEvaluationType;
 use App\Domain\Pak\Enums\PerformanceSourceKind;
+use App\Domain\Pak\Queries\ConversionDependencyReader;
 use App\Models\EmployeePositionHistory;
 use App\Models\PerformanceEvaluation;
+use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 
 final class SkpSourceSelectionResolver
 {
     /** Read-only internal API: the caller resolves case containment and position-month context. */
-    public function resolve(int $personId, SkpRequestedYearPartition $partition, ?SkpPositionMonthContext $positions = null): SkpSourceSelection
+    public function resolve(int $personId, SkpRequestedYearPartition $partition, ?SkpPositionMonthContext $positions = null, ?ConversionDependencyReader $reader = null): SkpSourceSelection
     {
         if ($personId < 1) {
             throw new InvalidArgumentException('INVALID_SOURCE_SELECTION_INPUT');
         }
+        $reader ??= app(ConversionPreviewDependencies::class);
         $months = $partition->months();
-        $candidates = PerformanceEvaluation::query()->where('person_id', $personId)
+        $candidates = $reader->sourceCandidates(fn (Builder $query) => $query->where('person_id', $personId)
             ->where('performance_year', $partition->year)->where('status', PerformanceEvaluationStatus::CURRENT)->where('source_kind', PerformanceSourceKind::OFFICIAL)
             ->whereIn('evaluation_type', [PerformanceEvaluationType::ANNUAL, PerformanceEvaluationType::Q1,
-                PerformanceEvaluationType::Q2, PerformanceEvaluationType::Q3, PerformanceEvaluationType::Q4])->get();
+                PerformanceEvaluationType::Q2, PerformanceEvaluationType::Q3, PerformanceEvaluationType::Q4]));
         // BR-SKP-002/009: source_date and formal coverage do not filter applied months.
         $priority = ['ANNUAL' => 5, 'Q4' => 4, 'Q3' => 3, 'Q2' => 2, 'Q1' => 1];
         $candidates = $candidates->filter(fn ($row) => $row->evaluation_type === PerformanceEvaluationType::ANNUAL
@@ -50,7 +53,7 @@ final class SkpSourceSelectionResolver
             // Context disambiguates multiple annuals; it never adds prerequisites to a single source.
             // An existing explicit link must still be validated, even for a single source.
             if ($multiple || $row->employee_position_history_id !== null) {
-                $proof = $this->historyProof($row);
+                $proof = $this->historyProof($row, $reader);
                 if ($proof === null) {
                     return $this->issue('SOURCE_POSITION_LINK_REQUIRES_REVIEW', $months);
                 }
@@ -119,19 +122,23 @@ final class SkpSourceSelectionResolver
     }
 
     /** @return array{id: int, method: string}|null */
-    private function historyProof(PerformanceEvaluation $row): ?array
+    private function historyProof(PerformanceEvaluation $row, ConversionDependencyReader $reader): ?array
     {
-        $query = EmployeePositionHistory::query()->with('functionalLevel')->where('person_id', $row->person_id)
-            ->whereNotNull('verified_at')->whereNotNull('verified_by')->whereNull('superseded_at');
         $explicit = $row->employee_position_history_id !== null;
-        if ($explicit) {
-            $query->whereKey($row->employee_position_history_id);
-        } elseif ($row->source_position_tmt !== null) {
-            $query->whereDate('tmt_start', $row->source_position_tmt->format('Y-m-d'));
-        } else {
+        if (! $explicit && $row->source_position_tmt === null) {
             return null;
         }
-        $histories = $query->get()->filter(fn ($history) => $this->consistent($row, $history, false));
+        $histories = $reader->historyCandidates(function (Builder $query) use ($row, $explicit) {
+            $query->where('person_id', $row->person_id)
+                ->whereNotNull('verified_at')->whereNotNull('verified_by')->whereNull('superseded_at');
+            if ($explicit) {
+                $query->whereKey($row->employee_position_history_id);
+            } else {
+                $query->whereDate('tmt_start', $row->source_position_tmt->format('Y-m-d'));
+            }
+
+            return $query;
+        })->filter(fn ($history) => $this->consistent($row, $history, false));
         if ($histories->count() !== 1 || ! $this->consistent($row, $histories->sole(), true)) {
             return null;
         }
@@ -145,7 +152,7 @@ final class SkpSourceSelectionResolver
         // Labels never reduce a candidate set: check them only after a unique structural match.
         $pairs = $labels ? [
             [$row->source_position_name, $history->position_name],
-            [$row->source_functional_level_label, $history->functionalLevel?->name],
+            [$row->source_functional_level_label, $history->getRelation('functionalLevel')?->name],
         ] : [
             [$row->source_position_tmt?->format('Y-m-d'), $history->tmt_start?->format('Y-m-d')],
             [$row->source_sk_number, $history->sk_number],

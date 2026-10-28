@@ -4,15 +4,16 @@ namespace App\Domain\Pak\Services;
 
 use App\Domain\Pak\DTOs\PositionMonthAssignment;
 use App\Domain\Pak\DTOs\PositionResolution;
-use App\Models\EmployeePositionHistory;
+use App\Domain\Pak\Queries\ConversionDependencyReader;
 use DateTimeImmutable;
 use DateTimeZone;
+use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 
 final class PositionSegmentResolver
 {
     /** @param non-empty-list<string> $months Ordered canonical months from completed monthly coverage. */
-    public function resolve(int $personId, array $months): PositionResolution
+    public function resolve(int $personId, array $months, ?ConversionDependencyReader $reader = null): PositionResolution
     {
         if ($personId < 1 || $months === [] || ! array_is_list($months)) {
             throw new InvalidArgumentException('INVALID_POSITION_RESOLUTION_INPUT');
@@ -30,11 +31,12 @@ final class PositionSegmentResolver
             $previous = $ordinal;
         }
         $last = $this->monthStart($months[array_key_last($months)])->format('Y-m-t');
-        $histories = EmployeePositionHistory::query()->with('functionalLevel')
+        $reader ??= app(ConversionPreviewDependencies::class);
+        $histories = $reader->historyCandidates(fn (Builder $query) => $query
             ->where('person_id', $personId)->whereNotNull('verified_by')->whereNotNull('verified_at')->whereNull('superseded_at')
             ->whereDate('tmt_start', '<=', $last)
             ->where(fn ($q) => $q->whereNull('tmt_end')->orWhereDate('tmt_end', '>=', $months[0].'-01'))
-            ->orderBy('tmt_start')->orderBy('id')->get();
+            ->orderBy('tmt_start')->orderBy('id'));
 
         $assignments = [];
         $issues = [];
@@ -95,7 +97,7 @@ final class PositionSegmentResolver
                 tmt_start: $selected->tmt_start->format('Y-m-d'), tmt_end: $selected->tmt_end?->format('Y-m-d'),
                 position_name: $selected->position_name, position_type: $selected->position_type,
                 functional_position_id: $selected->functional_position_id, functional_level_id: $selected->functional_level_id,
-                functional_level_code: $selected->functionalLevel?->code, functional_level_name: $selected->functionalLevel?->name,
+                functional_level_code: $selected->getRelation('functionalLevel')?->code, functional_level_name: $selected->getRelation('functionalLevel')?->name,
                 sk_number: $selected->sk_number, sk_date: $selected->sk_date?->format('Y-m-d'),
                 source: $selected->source, source_ref: $selected->source_ref,
                 verified_by: $selected->verified_by, verified_at: $selected->verified_at->format('Y-m-d H:i:s'),

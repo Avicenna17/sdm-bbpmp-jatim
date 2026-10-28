@@ -5,7 +5,10 @@ namespace Tests\Feature\Pak;
 use App\Domain\Pak\DTOs\ConversionPreviewRequest;
 use App\Domain\Pak\DTOs\ConversionRegimeEvidence;
 use App\Domain\Pak\Exceptions\ConversionRuleException;
+use App\Domain\Pak\Queries\ConversionDependencyReader;
 use App\Domain\Pak\Services\ConversionManifestBuilder;
+use App\Domain\Pak\Services\ConversionOrchestrator;
+use App\Domain\Pak\Services\ConversionPreviewDependencies;
 use App\Domain\Pak\Services\ConversionService;
 use App\Domain\Pak\Services\PositionSegmentResolver;
 use App\Models\AkCoefficientRule;
@@ -76,6 +79,108 @@ class ConversionPreviewTest extends TestCase
         foreach ([2023, 2024, 2025, 2026] as $year) {
             $this->evaluation($year);
         }
+    }
+
+    public static function extractionCases(): array
+    {
+        return array_map(fn ($case) => [$case], ['calculated', 'partial', 'validity', 'legacy', 'unproven', 'gap', 'overlap', 'missing_source', 'explicit_proof', 'missing_predicate', 'missing_coefficient']);
+    }
+
+    #[DataProvider('extractionCases')]
+    public function test_pre_extraction_manifest_fingerprints_and_complete_result_parity(string $scenario): void
+    {
+        // Fixed synthetic documentary timestamp: capture the committed 851fb45 output, not wall time.
+        DB::table('employee_position_histories')->update(['verified_at' => '2026-01-01 00:00:00']);
+        $start = '2023-11-01';
+        if ($scenario === 'partial') {
+            $start = '2023-11-15';
+        } elseif ($scenario === 'validity') {
+            DB::table('pak_rule_sets')->update(['valid_until' => null]);
+        } elseif ($scenario === 'legacy') {
+            DB::table('employee_position_histories')->update(['tmt_start' => '2022-01-01']);
+        } elseif ($scenario === 'unproven') {
+            DB::table('employee_position_histories')->update(['sk_number' => null]);
+        } elseif ($scenario === 'gap') {
+            DB::table('employee_position_histories')->update(['tmt_end' => '2024-12-31']);
+        } elseif ($scenario === 'overlap') {
+            $this->history->fresh()->replicate()->save();
+        } elseif ($scenario === 'missing_source') {
+            DB::table('performance_evaluations')->delete();
+        } elseif ($scenario === 'explicit_proof') {
+            DB::table('performance_evaluations')->update(['employee_position_history_id' => $this->history->id]);
+        } elseif ($scenario === 'missing_predicate') {
+            DB::table('performance_predicate_rules')->delete();
+        } elseif ($scenario === 'missing_coefficient') {
+            DB::table('ak_coefficient_rules')->delete();
+        }
+        $result = $this->preview($start);
+        $actual = [$result->dependency_fingerprint, $result->snapshot_fingerprint,
+            hash('sha256', json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))];
+        // Captured before production extraction from 851fb45 using the fixture above.
+        // Third digest covers every public DTO field, including manifest bytes, issue/list order and presentation.
+        $baseline = [
+            'calculated' => ['73a0e710d9606b8ed16cf627811c8f5ccbaf50632335cb13b1d7efdc475a1ee7', 'f4451bf266e4948ed5ab873adb6e30c3f29a3860394e34d756c5e737d0b77c81', '763c354b54c927cd5ca4ea4dd268b0980e4c8467cc08155f559c2a61fb360ece'],
+            'partial' => ['6beeec584438453ae40aae891c3fa7ea9f26f79ac0c195ff760a75b4a323d7a4', '311bafb92cd297e1a98f60df2cda2d88c3a54db00dc5696e38d0e5ec164d0d46', '079d9324a3b98f199e2074827e6231f1c5cd7e3035631da5d3290d83e4439b5a'],
+            'validity' => ['411c214f2c86fd472a888ccbbd8195d13983c07fb97a237f9a4053f1316d9d96', 'c35629bc3ebfe966c783a6c75e099c0e3d7ec6ce2ba683378c2f5b2d374eda71', '44a075ad599fc50889a05389a132d44d9620a38b87fdd145002cb7536277490f'],
+            'legacy' => ['1906b0fb9d7ba1e5661f68cb77127f683384580f4331604e760e4e9cf16e3e3f', 'ce80c23cf708b240e2d15f579cb183c3d56380db198f5a0076f5853feca7a6c8', '7c9c2e4853c2cd273f4a75ec3a579acb207f01913f28361dadc08fea288042f8'],
+            'unproven' => ['107c7213f2469f174cb1e4ee4b57213bf0d3a0f625163a20b9e9d3507825123e', '25c58a13462ea314db50b9a78d6d48481d30b63423b2ff5720459783294b5594', '8f2b2fd911814ed1f087fc56d46b7ade099509bf3f507ab1069efa3de7bacb78'],
+            'gap' => ['71a7418f86b3dde0695b5a5a8ed3ab2d1d2808d6431ad99fe26132ddc61edd62', '4235a2323694febeaf2de6175592ac3a77732ddf07642c4247b26b25aa486f3b', 'f098bacaa79d22c13e5113e80f513b8ea4b593eb1b0093cfb9de8cea13ad1923'],
+            'overlap' => ['330357f04920c0c4b48c74376387b5153266e0f6d4982c6fd4d820fc7c8d250a', '939c5700b34ae5ae5daff6f68e00d7e5c7ebf1864c7df40f943724af36e611e8', '20c3ad81ed407d742d99451a54a92880d0615b9646d460dfbca6c3288e776614'],
+            'missing_source' => ['20015064867b4fa82cb1a4337cdf5a70ce17241a4f1ccdd820900514a069521a', '60a18bb1cd0e6605d8a7712a0f04dce1239df7e857959cfac8da2e5c4147f16e', '5242d39d1139fc48eaa8e6c73c2e97f65bfb10ca4e82380fd7ebbdd9e418f90d'],
+            'explicit_proof' => ['3ead837ec1f99a9b8d7c2f044750864d31a8cad21bf93b1fc370d7d7f15de00d', 'cffa23017b0d122c8af7fcdc3000822e5a64a714105dfc46474af2a5344b138e', '7b83e610ecf7f3689a36284e5732977347e5b11469e181d874386b832e43bb62'],
+            'missing_predicate' => ['34267114c6227aef9fd0bacdcd091c363a2516b37e0e498ba16c71fa02fc6b72', '082838a309819c3d0af0cbbb60c253e6c87a3980349f96e9abce3c443be1e76d', 'e1b2041b445a2e62642903aec7c4dffa751c47025c4cbf77b88a484d7cd22019'],
+            'missing_coefficient' => ['0076e1bf4130450de506a2708002f8d2e1cd6df4db505391bb08a5d44d260823', '8475068131ff4798cc2e0483e27ef64ed2610f1cc3f0edf9a4d5e2b6638f0b53', '33e2a7100913433a0c272aa9d21df1bd1436dec9d59a2265ef10aeda2dc92537'],
+        ];
+        $this->assertSame($baseline[$scenario], $actual);
+    }
+
+    public static function readerProofCases(): array
+    {
+        return [['single'], ['explicit'], ['reconstructed']];
+    }
+
+    #[DataProvider('readerProofCases')]
+    public function test_orchestration_uses_only_explicit_reader_including_history_proof_relations(string $proof): void
+    {
+        if ($proof === 'explicit') {
+            DB::table('performance_evaluations')->update(['employee_position_history_id' => $this->history->id]);
+        } elseif ($proof === 'reconstructed') {
+            $this->evaluation(2026);
+            DB::table('performance_evaluations')->update(['source_position_tmt' => '2023-01-01']);
+        }
+        $snapshot = app(ConversionPreviewDependencies::class);
+        $reader = \Mockery::mock(ConversionDependencyReader::class);
+        $recorded = [];
+        foreach (['case', 'ruleSet', 'read', 'fields', 'sourceCandidates', 'historyCandidates', 'predicateRules', 'coefficientRules'] as $method) {
+            $reader->shouldReceive($method)->andReturnUsing(function (...$args) use ($method, $snapshot, &$recorded) {
+                $result = $snapshot->$method(...$args);
+                $recorded[] = [$method, $result];
+
+                return $result;
+            });
+        }
+        $request = new ConversionPreviewRequest($this->case->id, '2023-11-01', '2026-10-31');
+        $orchestrator = app(ConversionOrchestrator::class);
+        $expected = $this->preview();
+        $recordedResult = DB::transaction(fn () => $orchestrator->build($request, $reader));
+        $this->assertEquals($expected, $recordedResult);
+        $detachedReader = \Mockery::mock(ConversionDependencyReader::class);
+        foreach ($recorded as [$method, $result]) {
+            $detachedReader->shouldReceive($method)->once()->ordered()->andReturn($result);
+        }
+        $queries = [];
+        DB::listen(function ($event) use (&$queries) {
+            $queries[] = $event->sql;
+        });
+        // Test-only recorded inputs: no database reads, relation lazy loads or owned transaction.
+        $actual = $orchestrator->build($request, $detachedReader);
+        $this->assertSame([], $queries);
+        $this->assertSame(0, DB::transactionLevel());
+        $this->assertEquals($expected, $actual);
+        $this->assertSame($expected->dependencies->groups, $actual->dependencies->groups);
+        $this->assertSame($expected->dependency_fingerprint, $actual->dependency_fingerprint);
+        $this->assertSame($expected->snapshot_fingerprint, $actual->snapshot_fingerprint);
+        $this->assertNoModels($actual);
     }
 
     private function evaluation(int $year, string $type = 'ANNUAL'): PerformanceEvaluation
@@ -654,10 +759,13 @@ class ConversionPreviewTest extends TestCase
             $during = $this->preview();
             $this->assertTrue($changed);
             $this->assertSame($originalReference, $during->dependencies->groups['rule_set']['reference']);
+            $this->assertSame($result->dependencies->groups, $during->dependencies->groups);
             $this->assertSame($result->dependency_fingerprint, $during->dependency_fingerprint);
+            $this->assertSame($result->snapshot_fingerprint, $during->snapshot_fingerprint);
             $later = $this->preview();
             $this->assertSame('Synthetic concurrent reference', $later->dependencies->groups['rule_set']['reference']);
             $this->assertNotSame($during->dependency_fingerprint, $later->dependency_fingerprint);
+            $this->assertNotSame($during->snapshot_fingerprint, $later->snapshot_fingerprint);
         } finally {
             $armed = false;
             if ($other->inTransaction()) {

@@ -3,15 +3,52 @@
 namespace App\Domain\Pak\Services;
 
 use App\Domain\Pak\DTOs\MonthlyCoverage;
+use App\Domain\Pak\Queries\ConversionDependencyReader;
+use App\Models\AkCoefficientRule;
 use App\Models\EmployeePositionHistory;
 use App\Models\FunctionalLevel;
 use App\Models\FunctionalPosition;
+use App\Models\PakCase;
+use App\Models\PakRuleSet;
 use App\Models\PerformanceEvaluation;
+use App\Models\PerformancePredicateRule;
+use Closure;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 /** Evidence reader only. Selection algorithms remain in the accepted resolvers. */
-final class ConversionPreviewDependencies
+final class ConversionPreviewDependencies implements ConversionDependencyReader
 {
+    public function case(int $id): PakCase
+    {
+        return PakCase::findOrFail($id);
+    }
+
+    public function ruleSet(int $id): ?PakRuleSet
+    {
+        return PakRuleSet::find($id);
+    }
+
+    public function sourceCandidates(Closure $scope): Collection
+    {
+        return $scope(PerformanceEvaluation::query())->get();
+    }
+
+    public function historyCandidates(Closure $scope): Collection
+    {
+        return $scope(EmployeePositionHistory::query()->with('functionalLevel'))->get();
+    }
+
+    public function predicateRules(int $ruleSetId, string $predicateCode): Collection
+    {
+        return PerformancePredicateRule::where('pak_rule_set_id', $ruleSetId)->where('predicate_code', $predicateCode)->limit(2)->get();
+    }
+
+    public function coefficientRules(int $ruleSetId, int $functionalLevelId): Collection
+    {
+        return AkCoefficientRule::where('pak_rule_set_id', $ruleSetId)->where('functional_level_id', $functionalLevelId)->limit(2)->get();
+    }
+
     /** @param list<string> $fields @return array<string, int|string|bool|null> */
     public function fields(Model $row, array $fields): array
     {

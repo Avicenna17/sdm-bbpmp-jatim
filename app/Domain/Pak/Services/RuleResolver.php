@@ -5,17 +5,15 @@ namespace App\Domain\Pak\Services;
 use App\Domain\Pak\DTOs\ResolvedCoefficientRule;
 use App\Domain\Pak\DTOs\ResolvedPredicateRule;
 use App\Domain\Pak\Exceptions\ConversionRuleException;
+use App\Domain\Pak\Queries\ConversionDependencyReader;
 use App\Domain\Pak\Rules\ConversionRuleValues;
-use App\Models\AkCoefficientRule;
-use App\Models\PakRuleSet;
-use App\Models\PerformancePredicateRule;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
 final class RuleResolver
 {
     // Runtime checks also reject scalar coercion from non-strict PHP callers.
-    public function resolvePredicate(mixed $ruleSetId, mixed $predicateCode): ResolvedPredicateRule
+    public function resolvePredicate(mixed $ruleSetId, mixed $predicateCode, ?ConversionDependencyReader $reader = null): ResolvedPredicateRule
     {
         $this->inputId($ruleSetId);
         try {
@@ -25,8 +23,9 @@ final class RuleResolver
         } catch (ValidationException) {
             throw new ConversionRuleException('INVALID_RULE_INPUT');
         }
-        $this->ruleSet($ruleSetId);
-        $rows = PerformancePredicateRule::where('pak_rule_set_id', $ruleSetId)->where('predicate_code', $predicateCode)->limit(2)->get();
+        $reader ??= app(ConversionPreviewDependencies::class);
+        $this->ruleSet($ruleSetId, $reader);
+        $rows = $reader->predicateRules($ruleSetId, $predicateCode);
         if ($rows->isEmpty()) {
             throw new ConversionRuleException('PREDICATE_RULE_NOT_FOUND');
         }
@@ -51,12 +50,13 @@ final class RuleResolver
         return new ResolvedPredicateRule($ruleSetId, (int) $row->id, $code, $name, $factor);
     }
 
-    public function resolveCoefficient(mixed $ruleSetId, mixed $functionalLevelId): ResolvedCoefficientRule
+    public function resolveCoefficient(mixed $ruleSetId, mixed $functionalLevelId, ?ConversionDependencyReader $reader = null): ResolvedCoefficientRule
     {
         $this->inputId($ruleSetId);
         $this->inputId($functionalLevelId);
-        $this->ruleSet($ruleSetId);
-        $rows = AkCoefficientRule::where('pak_rule_set_id', $ruleSetId)->where('functional_level_id', $functionalLevelId)->limit(2)->get();
+        $reader ??= app(ConversionPreviewDependencies::class);
+        $this->ruleSet($ruleSetId, $reader);
+        $rows = $reader->coefficientRules($ruleSetId, $functionalLevelId);
         if ($rows->isEmpty()) {
             throw new ConversionRuleException('COEFFICIENT_RULE_NOT_FOUND');
         }
@@ -83,9 +83,9 @@ final class RuleResolver
         }
     }
 
-    private function ruleSet(int $id): void
+    private function ruleSet(int $id, ConversionDependencyReader $reader): void
     {
-        $rule = PakRuleSet::find($id);
+        $rule = $reader->ruleSet($id);
         if (! $rule) {
             throw new ConversionRuleException('RULE_SET_NOT_FOUND');
         }
