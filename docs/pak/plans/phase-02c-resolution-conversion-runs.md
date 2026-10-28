@@ -299,7 +299,7 @@ Inactive master tetap historical-resolvable. Suitability dipisahkan dari histori
 
 ### Regime
 
-BR-REGIME-001 tetap berlaku. LEGACY/AK Integrasi tidak dihitung atau ditambahkan oleh conversion engine. Canonical review outcome dan proof TMT Jabatan SK mengikuti OD-12 pada section 11; bukan generic history.tmt_start atau label-based classification.
+BR-REGIME-001 tetap berlaku. LEGACY/AK Integrasi tidak dihitung atau ditambahkan oleh conversion engine. Canonical review outcome mengikuti OD-12 dan proof TMT Jabatan SK mengikuti OD-13 pada section 11; bukan generic history.tmt_start atau label-based classification.
 
 ### OD-04 — RESOLVED: History end/gap dalam bulan
 
@@ -531,7 +531,7 @@ No generic status setter, free-form approval workflow, or in-place REQUIRES_REVI
 6. Collect eligible CURRENT sources dan resolve position per bulan.
 7. Finalize source selection/proof.
 8. Bentuk contiguous calculation/diagnostic lines menurut approved period-building contract.
-9. Periksa regime dan suitability.
+9. Buktikan TMT Jabatan SK menurut OD-13, lalu periksa regime dan suitability.
 10. RuleResolver.
 11. ConversionInput.
 12. ConversionCalculator dan exact total.
@@ -562,6 +562,7 @@ Setelah validity lolos dan applicable regime mengizinkan current-rule lookup, pr
 |---|---|
 | `RULE_VALIDITY_REQUIRES_REVIEW` | Global diagnostics-only; bounded reason `UNKNOWN_BOUNDARY` atau `OUTSIDE_VALIDITY` |
 | `LEGACY_REGIME_REQUIRES_REVIEW` | OD-12: authoritative TMT Jabatan SK evidence places affected line in LEGACY; non-numeric diagnostic, complete total NULL |
+| `REGIME_EVIDENCE_REQUIRES_REVIEW` | OD-13: resolved position/history tanpa cukup documentary TMT Jabatan SK proof; tidak diklasifikasikan LEGACY/CURRENT, affected line non-numeric dan complete total NULL |
 | `PREDICATE_RULE_NOT_FOUND` | Missing exact predicate after applicable regime gate; affected line diagnostic |
 | `COEFFICIENT_RULE_NOT_FOUND` | Missing exact coefficient untuk canonical level; affected line diagnostic |
 | `MISSING_FUNCTIONAL_LEVEL` | Position resolution sukses, tetapi selected authoritative position tidak menyediakan canonical level yang diperlukan untuk coefficient lookup |
@@ -570,7 +571,7 @@ Setelah validity lolos dan applicable regime mengizinkan current-rule lookup, pr
 | `RULE_SET_NOT_FOUND` | Explicit rule set tidak tersedia; authoritative save ditolak |
 | `INVALID_RULE_INPUT` | Input resolver tidak memenuhi contract; rejection, bukan review-saveable condition |
 
-Lima review outcomes pertama boleh disimpan sebagai diagnostics hanya jika semua save gates lain sukses. Empat integrity/rejection outcomes terakhir boleh tampil sebagai safe preview diagnostics bila sesuai, tetapi tidak boleh menghasilkan authoritative contradictory run. Position gap/overlap tetap `MISSING_POSITION_HISTORY`/`AMBIGUOUS_POSITION_HISTORY`, bukan `MISSING_FUNCTIONAL_LEVEL`. Dua code yang diperkenalkan OD-11 membedakan temporal validity dari lifecycle/child absence dan missing canonical lookup key dari missing coefficient untuk key yang valid.
+Enam review outcomes pertama boleh disimpan sebagai diagnostics hanya jika semua save gates lain sukses. Empat integrity/rejection outcomes terakhir boleh tampil sebagai safe preview diagnostics bila sesuai, tetapi tidak boleh menghasilkan authoritative contradictory run. Position gap/overlap tetap `MISSING_POSITION_HISTORY`/`AMBIGUOUS_POSITION_HISTORY`, bukan `MISSING_FUNCTIONAL_LEVEL`. Dua code yang diperkenalkan OD-11 membedakan temporal validity dari lifecycle/child absence dan missing canonical lookup key dari missing coefficient untuk key yang valid.
 
 `RULE_VALIDITY_REQUIRES_REVIEW` dapat membawa requested_start/end, validity dates, dan rule-set ID/version. Issues/audit hanya safe bounded context; jangan memuat document bodies, NIP, private paths, raw SQL, exception traces, atau whole-model serialization.
 
@@ -588,7 +589,25 @@ Affected LEGACY line adalah review-saveable diagnostic: run menjadi REQUIRES_REV
 
 Canonical full-month coverage dipertahankan. Diagnostic periods memakai contract 02C.4 dengan issue/trace dan nullable numeric fields yang tersedia; tidak ada bentuk persistence, tabel, atau cardinality baru. Jangan otomatis consume, transfer, backfill, atau menambahkan stored AK Integrasi; jangan reinterpret old-regime AK Integrasi sebagai new conversion output. Penggunaan/transfer AK Integrasi kelak adalah business/lifecycle handling terpisah dari 02C.5.2.
 
-Precedence orchestration: case/rule identity/integrity → requested range/containment → OD-03 → OD-11 → source/position resolution → regime/suitability → child-rule resolution → numeric calculation. OD-03/OD-11 short-circuit tetap berlaku; OD-12 tidak mengubah source selection, continuity, exact arithmetic, rounding, atau Golden total 75/1.
+Precedence orchestration: case/rule identity/integrity → requested range/containment → OD-03 → OD-11 → source/position resolution → TMT Jabatan SK evidence (OD-13) → regime/suitability → child-rule resolution → numeric calculation. OD-03/OD-11 short-circuit tetap berlaku; OD-12 tidak mengubah source selection, continuity, exact arithmetic, rounding, atau Golden total 75/1.
+
+### OD-13 — RESOLVED: TMT Jabatan SK Evidence Contract
+
+Selected authoritative EmployeePositionHistory membuktikan documentary TMT Jabatan SK hanya jika seluruh syarat terpenuhi:
+
+- Milik authoritative person.
+- Verified menurut existing contract (`verified_by` dan `verified_at` tersedia), non-superseded, dan dipilih melalui OD-04.
+- `tmt_start` tersedia.
+- `sk_number` tersedia dan nonblank.
+- `source_ref` sebagai documentary reference tersedia dan nonblank.
+
+Untuk row documentary-complete tersebut saja, business contract menerima `employee_position_histories.tmt_start` sebagai **effective TMT Jabatan SK untuk regime classification only**. Ini bukan equivalence untuk setiap history dalam database. `sk_date` tetap tanggal dokumen/SK, bukan effective TMT Jabatan dan tidak pernah dipakai untuk boundary 2023. `tmt_start` tanpa syarat di atas, `sk_date`, `source_position_tmt`, free-text `source_ref` sendiri, position names/labels, dan functional-level labels tidak cukup sebagai proof.
+
+Jika proof terpenuhi: TMT Jabatan SK < 2023-01-01 menghasilkan `LEGACY_REGIME_REQUIRES_REVIEW` sesuai OD-12; TMT Jabatan SK >= 2023-01-01 mengizinkan CURRENT regime melanjutkan current child-rule resolution, subject to other gates. Jika position/history berhasil resolved tetapi proof tidak cukup, hasilnya **`REGIME_EVIDENCE_REQUIRES_REVIEW`**, bukan LEGACY atau CURRENT. Position gap/overlap tetap menggunakan issue OD-04, bukan diganti dengan issue evidence.
+
+`REGIME_EVIDENCE_REQUIRES_REVIEW` adalah review-saveable hanya jika seluruh authoritative save gates lolos. Affected line non-numeric, exact result NULL, complete parent exact total NULL. Jangan menjalankan current-regime predicate/coefficient lookup untuk line tersebut atau emit missing-child issues hanya karena lookup sengaja dilewati. Jangan fabricate zero, silently drop month/line, atau consume/transfer/backfill/add stored AK Integrasi. Pertahankan canonical coverage dan bounded provenance melalui existing diagnostic-period contract; tidak ada schema/persistence shape baru.
+
+Precedence: case/rule identity/integrity → requested range/containment → OD-03 → OD-11 → source/position resolution → TMT Jabatan SK evidence → regime/suitability → child-rule resolution → numeric calculation. OD-13 hanya menetapkan proof dan insufficient-evidence outcome; OD-12 tetap mensyaratkan proven TMT Jabatan SK < 2023-01-01 untuk LEGACY. Tidak mengubah OD-03/04/07/08/09/10/11, source selection, exact arithmetic, Golden 75/1, atau coordination order.
 
 ### Preview
 
@@ -873,7 +892,7 @@ Independent processes/connections, bounded timeouts, and fresh final assertions 
 | **02C.2** | OD-03 RESOLVED; implementasi mengikuti full-month-only contract dan TC-PAK-039; coverage dan requested-range guards lulus |
 | **02C.3** | OD-04 RESOLVED; continuity-first menghasilkan assignment/provenance atau structured issues; position/proof integration dan TC-PAK-040 lulus; tidak mengimplikasikan perubahan source/schema |
 | **02C.4** | DTO final; OD-09 RESOLVED dan OD-10 schema/auth/audit mutation boundary RESOLVED; implement approved schema contract dan hanya items `[02C.4]` pada umbrella TC-PAK-041; planned executable gates `[02C.5]`/`[02C.6]` tidak memblok acceptance 02C.4 |
-| **02C.5** | Terapkan OD-10 resolved boundary dan OD-11 RESOLVED sesuai TC-PAK-042; 02C.5.2 initial-only boundary dan OD-12 berlaku; OD-08 tetap DEFERRED, bukan prerequisite initial-only API; review-assessment mutation di luar 02C.5.2; 02C.5.1 lengkap sebelum acceptance 02C.5.2 |
+| **02C.5** | Terapkan OD-10 resolved boundary dan OD-11 RESOLVED sesuai TC-PAK-042; 02C.5.2 initial-only boundary, OD-12, dan OD-13 berlaku; OD-08 tetap DEFERRED, bukan prerequisite initial-only API; review-assessment mutation di luar 02C.5.2; 02C.5.1 lengkap sebelum acceptance 02C.5.2 |
 | **02C.6** | Replacement/replay final; required MariaDB races dan relevant 02A regression lulus |
 
 Tidak ada slice ketujuh. 02C.5.1/02C.5.2 hanya decomposition delivery internal.
@@ -910,6 +929,7 @@ Tidak ada slice ketujuh. 02C.5.1/02C.5.2 hanya decomposition delivery internal.
 | OD-10 Audit/review authorization | **RESOLVED for schema/auth/audit mutation boundary** | Existing permission bundle; assessment fields/event, explicit lifecycle transitions and atomic bounded audit; no approval/finalization |
 | OD-11 Rule validity behavior | **RESOLVED** | Explicit case rule set; known inclusive validity covers entire request; NULL = unknown; failure diagnostics-only tanpa angka/total, conditional review save; precedence dan child outcomes mengikuti section 11; executable gate 02C.5/TC-PAK-042 |
 | OD-12 Canonical LEGACY outcome | **RESOLVED** | Authoritative TMT Jabatan SK < 2023-01-01 → LEGACY_REGIME_REQUIRES_REVIEW; affected line non-numeric, parent total NULL, conditional diagnostic save; no current-rule lookup or AK Integrasi consumption; section 11 |
+| OD-13 TMT Jabatan SK evidence | **RESOLVED** | Selected same-person verified/non-superseded OD-04 history + tmt_start + nonblank sk_number/source_ref proves effective TMT Jabatan SK for regime only; insufficient proof → REGIME_EVIDENCE_REQUIRES_REVIEW; section 11 |
 | Active source eligibility | **RESOLVED invariant** | CURRENT + OFFICIAL + ANNUAL/Q1–Q4 |
 | Requested-range containment | **RESOLVED invariant** | Valid non-empty subset/equal authoritative case period |
 | Calculation snapshot immutability | **RESOLVED invariant** | Lifecycle metadata saja yang boleh dimutasi melalui authorized service |

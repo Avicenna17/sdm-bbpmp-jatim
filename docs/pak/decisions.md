@@ -119,3 +119,16 @@ Pada checkpoint OD-09/OD-10 ini, OD-07 tetap BUSINESS PENDING, OD-08 deferred, d
 - Initial-save lock order: Case → Person → RuleSet → relevant shared masters → applicable conversion-run check → evaluations → histories. Tidak ada predecessor/replacement; jangan acquire earlier resource setelah later resource. Protocol 02C.5.1 tetap.
 
 **OD-07 tetap BUSINESS PENDING; OD-08 tetap DEFERRED.** OD-03–OD-11, source selection, exact arithmetic/rounding, Golden 75/1, dan persistence schema tidak berubah. Authoritative detail: [section 11 Phase 02C plan](plans/phase-02c-resolution-conversion-runs.md#11-02c5--conversion-run-orchestration).
+
+# Keputusan client Phase 02C.5.2.A — OD-13 TMT Jabatan SK Evidence Contract
+
+**OD-13 — RESOLVED.** Sumber: keputusan eksplisit client setelah evidence audit baseline `a838dea`; documentation-only, tanpa authority regulasi baru atau perubahan approval status rule lain. Contract lengkap: [OD-13 Phase 02C plan](plans/phase-02c-resolution-conversion-runs.md#od-13--resolved-tmt-jabatan-sk-evidence-contract).
+
+- Proof memerlukan selected authoritative EmployeePositionHistory: same authoritative person, verified (`verified_by`/`verified_at`), non-superseded, dipilih melalui OD-04, `tmt_start` tersedia, serta `sk_number` dan documentary `source_ref` tersedia/nonblank. Hanya untuk row documentary-complete ini, `employee_position_histories.tmt_start` diterima sebagai effective TMT Jabatan SK untuk regime classification only.
+- `sk_date` adalah document date, bukan effective TMT dan tidak dipakai pada boundary 2023. TMT tanpa documentary requirements, `sk_date`, `source_position_tmt`, reference free text sendiri, position names/labels, dan functional-level labels bukan proof yang cukup.
+- Proven TMT < 2023-01-01 → existing `LEGACY_REGIME_REQUIRES_REVIEW`; proven TMT >= 2023-01-01 → CURRENT regime boleh menuju child-rule resolution subject to other gates. Resolved position/history dengan proof tidak cukup → `REGIME_EVIDENCE_REQUIRES_REVIEW`, tidak LEGACY dan tidak CURRENT.
+- Evidence issue review-saveable subject to all save gates; affected line non-numeric, exact result NULL, complete parent total NULL. Skip current-regime child lookup tanpa unrelated missing predicate/coefficient issues. Preserve canonical coverage/bounded provenance; no zero, silent drop, atau consume/transfer/backfill/add stored AK Integrasi. Existing diagnostic-period schema tetap.
+- Canonical review-saveable rule/regime list kini: `RULE_VALIDITY_REQUIRES_REVIEW`, `LEGACY_REGIME_REQUIRES_REVIEW`, `REGIME_EVIDENCE_REQUIRES_REVIEW`, `PREDICATE_RULE_NOT_FOUND`, `COEFFICIENT_RULE_NOT_FOUND`, `MISSING_FUNCTIONAL_LEVEL`. Ini memperluas checkpoint terdahulu tanpa mengganti existing OD-03/source/position issues.
+- Precedence: case/rule identity/integrity → requested range/containment → OD-03 → OD-11 → source/position resolution → TMT Jabatan SK evidence → regime/suitability → child-rule resolution → numeric calculation.
+
+OD-12 LEGACY semantics tetap; OD-13 hanya menetapkan documentary proof dan unavailable-proof outcome. OD-07 tetap BUSINESS PENDING, OD-08 tetap DEFERRED. OD-03/04/09/10/11, source selection, exact arithmetic, Golden 75/1, persistence schema, dan coordination order tidak berubah. Tidak mengotorisasi implementasi preview pada documentation pass ini.
