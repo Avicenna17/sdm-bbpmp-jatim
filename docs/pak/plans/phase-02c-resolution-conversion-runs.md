@@ -503,8 +503,8 @@ Original issue tidak dihapus atau ditulis ulang ketika assessment baru dibuat. R
 | Operation | Persisted outcome |
 |---|---|
 | Ordinary read-only preview | No row, no audit |
-| Authoritative initial save without unresolved run issues | PREVIEW |
-| Authoritative initial save with unresolved issues | REQUIRES_REVIEW |
+| Authoritative initial save without unresolved run issues, all save gates passed | PREVIEW |
+| Authoritative initial save with only OD-14 allowlisted unresolved issues, all save gates passed | REQUIRES_REVIEW |
 | Explicit assessment requiring review | PREVIEW → REQUIRES_REVIEW |
 | Subsequent explicit review assessment update | REQUIRES_REVIEW → REQUIRES_REVIEW |
 | Explicit replacement | Predecessor PREVIEW/REQUIRES_REVIEW → SUPERSEDED; successor → PREVIEW or REQUIRES_REVIEW |
@@ -609,6 +609,80 @@ Jika proof terpenuhi: TMT Jabatan SK < 2023-01-01 menghasilkan `LEGACY_REGIME_RE
 
 Precedence: case/rule identity/integrity → requested range/containment → OD-03 → OD-11 → source/position resolution → TMT Jabatan SK evidence → regime/suitability → child-rule resolution → numeric calculation. OD-13 hanya menetapkan proof dan insufficient-evidence outcome; OD-12 tetap mensyaratkan proven TMT Jabatan SK < 2023-01-01 untuk LEGACY. Tidak mengubah OD-03/04/07/08/09/10/11, source selection, exact arithmetic, Golden 75/1, atau coordination order.
 
+### OD-14 — RESOLVED: Initial Authoritative Save Consistency Contract
+
+**Sumber:** keputusan client setelah audit read-only baseline `f30489c`. Berlaku untuk initial-only 02C.5.2.B; bukan implementasi source atau perubahan schema/business outcomes OD-03–OD-13. Acceptance dirinci pada TC-PAK-041, subsection OD-14.
+
+#### Inventaris canonical outcomes dan exhaustive saveability
+
+Inventaris source pada baseline tersebut (nama code tidak diubah):
+
+| Semantic owner | Outcomes yang diterbitkan |
+|---|---|
+| MonthlyCoverageResolver → MonthlyCoverage::partialReview | `PARTIAL_MONTH_REQUIRES_REVIEW` |
+| SkpSourceSelectionResolver | `SOURCE_NOT_FOUND`, `AMBIGUOUS_SOURCE_SELECTION`, `SOURCE_POSITION_LINK_REQUIRES_REVIEW`, `SOURCE_INTEGRITY_ERROR` |
+| PositionSegmentResolver | `MISSING_POSITION_HISTORY`, `AMBIGUOUS_POSITION_HISTORY` |
+| ConversionRegimeEvidence (OD-13/OD-12) | `LEGACY_REGIME_REQUIRES_REVIEW`, `REGIME_EVIDENCE_REQUIRES_REVIEW` |
+| ConversionService orchestration | `RULE_VALIDITY_REQUIRES_REVIEW`, `MISSING_FUNCTIONAL_LEVEL`; rule identity/integrity failures memakai existing rule exceptions |
+| RuleResolver | `PREDICATE_RULE_NOT_FOUND`, `COEFFICIENT_RULE_NOT_FOUND`, `RULE_INTEGRITY_ERROR`, `RULE_SET_NOT_USABLE`, `RULE_SET_NOT_FOUND`, `INVALID_RULE_INPUT` |
+
+Input/structural exceptions bukan review issues: MonthlyCoverageRequest memakai `INVALID_COVERAGE_DATE`, `INVALID_CASE_RANGE`, `INVALID_REQUESTED_RANGE`, `REQUESTED_RANGE_OUTSIDE_CASE`; source/position resolvers memakai `INVALID_SOURCE_SELECTION_INPUT` / `INVALID_POSITION_RESOLUTION_INPUT`, dan MonthlyCoverage invariant memakai `INVALID_MONTHLY_COVERAGE_RESULT`.
+
+**Exhaustive review-saveable allowlist untuk initial save**, selalu subject to ALL structural/save preconditions:
+
+- `PARTIAL_MONTH_REQUIRES_REVIEW`
+- `SOURCE_NOT_FOUND`
+- `AMBIGUOUS_SOURCE_SELECTION`
+- `SOURCE_POSITION_LINK_REQUIRES_REVIEW`
+- `MISSING_POSITION_HISTORY`
+- `AMBIGUOUS_POSITION_HISTORY`
+- `RULE_VALIDITY_REQUIRES_REVIEW`
+- `LEGACY_REGIME_REQUIRES_REVIEW`
+- `REGIME_EVIDENCE_REQUIRES_REVIEW`
+- `PREDICATE_RULE_NOT_FOUND`
+- `COEFFICIENT_RULE_NOT_FOUND`
+- `MISSING_FUNCTIONAL_LEVEL`
+
+Jangan memakai generic `any non-empty issues => REQUIRES_REVIEW`. Setiap issue harus allowlisted dan tidak boleh ada blocking condition. Jika lolos, diagnostic run berstatus REQUIRES_REVIEW; incomplete authoritative calculation memiliki complete parent total NULL dan affected exact results NULL. Jangan membuat arbitrary winner, fabricated zero/source/position/rule/period. Persist periods tepat seperti authoritative orchestration contract, tanpa cardinality baru. Partial OD-03 menyimpan original requested dates, zero periods, dan total NULL. Tepat satu CONVERSION_RUN_SAVED bertahan hanya bila save commit sukses.
+
+**Blocking/default-deny:** `SOURCE_INTEGRITY_ERROR` berarti source dependency state tidak cukup trustworthy untuk authoritative persistence; reject, jangan downgrade ke REQUIRES_REVIEW. `RULE_INTEGRITY_ERROR`, `RULE_SET_NOT_USABLE`, `RULE_SET_NOT_FOUND`, `INVALID_RULE_INPUT` tetap blocking. Unknown/unclassified future issue codes **blocking by default** sampai ditambahkan secara eksplisit ke approved allowlist. Blocking outcome tidak menyimpan run/period, tidak increment case lock_version, dan tidak menghasilkan committed CONVERSION_RUN_SAVED.
+
+Issue saveability tidak menggantikan save gates. Authorization/inactive actor, invalid case/person/rule identity, invalid/reversed/outside-case request, stale case version/fingerprint, ANY existing run, first-use/rule integrity failure, persistence constraint failure, dan infrastructure/database failure tetap menolak save walaupun ada allowlisted diagnostic. Tidak ada perubahan source-selection/position winner semantics atau numeric eligibility.
+
+#### Tiga mandatory stale-preview preconditions
+
+Initial save wajib menerima **expected case lock version, expected dependency fingerprint, dan expected snapshot fingerprint**. Ketiganya wajib; snapshot hash bukan optional.
+
+- Locked PakCase.lock_version harus sama dengan expected N: melindungi case lifecycle context.
+- Server rebuild authoritative dependency graph di bawah save coordination dan menghitung dependency_fingerprint: mengikat semantic dependency evidence; harus sama dengan expected dependency fingerprint.
+- Server rebuild exact outputs/issues dan menghitung snapshot_fingerprint: mengikat exact calculated outputs/issues yang direpresentasikan preview; harus sama dengan expected snapshot fingerprint.
+
+Client hanya mengirim intent dan comparison preconditions, bukan authority untuk selected IDs, operands/results, issues, manifest, periods atau total. Kedua persisted fingerprints selalu hasil server reconstruction, bukan salinan client payload. Mismatch salah satu dari tiga preconditions adalah stale/conflict: rollback, no run/period/case increment/audit; caller wajib memperoleh dan meninjau preview baru sebelum mencoba lagi. Mismatch bukan REQUIRES_REVIEW, idempotency key, replay success, atau izin return-existing-run. Semantic fingerprint tetap mengecualikan optimistic-version increment; tidak ada self-hash.
+
+#### Conversion initial-save retry policy
+
+Maksimum **3 total attempts**, hanya untuk exact predicate existing `SkpCommitRetryPolicy::allowsDeadlock()`: setelah unwrap Laravel DeadlockException melalui previous exception sesuai helper existing, error wajib QueryException dengan `errorInfo[0] === '40001'` **AND** `(int) errorInfo[1] === 1213`. Jangan memperluas predicate atau memakai `allows()` yang juga menerima SKP-specific unique collision.
+
+Setiap attempt memiliki fresh top-level coordinated transaction dan mengulang case load/lock, Person, RuleSet, relevant master coordination, existing-run guard, evaluation/history current reads/locks, shared orchestration, exact calculation, kedua fingerprints, semua preconditions/saveability checks, persistence, case version transition, dan audit insertion. Pertahankan original request/expected preconditions; jangan retain Eloquent models, selected evaluations/histories, rule operands, results, manifests, rebuilt fingerprints, run/period/audit IDs, revision allocation atau transaction-local assumptions antar-attempt.
+
+Tidak retry stale version, dependency/snapshot mismatch, existing run, authorization/inactive actor, SOURCE_INTEGRITY_ERROR, rule rejection/integrity outcomes, validation failure, generic unique conflict/vendor 1062, lock-wait timeout yang tidak memenuhi exact predicate, arbitrary SQL/database error, atau audit/domain failure. SKP current-source collision retry tidak berlaku untuk conversion save. Setelah attempt ketiga gagal dengan approved deadlock, rollback seluruh partial state dan kembalikan existing repository-appropriate sanitized technical/infrastructure failure; bukan PAK business issue baru atau diagnostic run.
+
+#### Initial-only, first-use, version dan audit
+
+ANY PakConversionRun history pada case menolak initial save, termasuk PREVIEW/REQUIRES_REVIEW/SUPERSEDED atau projection inactive. Tidak return existing as success, replay, idempotent success, next-revision allocation atau replacement. Initial values: `revision_number = 1`, `predecessor_run_id = NULL`, `revision_reason = NULL`. OD-08 tetap DEFERRED dan bukan prerequisite initial-only save.
+
+PakCase lifecycle tetap sole writer first_used_at. Conversion save hanya memvalidasi required marker; tidak set/repair/backfill/mutate. Required marker missing/inconsistent → RULE_INTEGRITY_ERROR, blocking, tanpa run persistence.
+
+Locked expected case N menghasilkan run.case_lock_version **N+1 sejak creation**, dan PakCase.lock_version berubah tepat sekali N → N+1 dalam transaction yang sama. Jangan update immutable run belakangan hanya untuk patch version. Rollback meninggalkan case pada N.
+
+Subject audit hanya PakConversionRun, event hanya CONVERSION_RUN_SAVED untuk successful initial save. Event di-insert dalam transaction yang sama dengan run, periods dan case version; audit failure rollback semuanya. PakConversionPeriod bukan subject/event terpisah. Tidak ada review-assessed/replaced/recalculation event pada slice ini. Existing OD-10 bounded payload/actor/permission contract tetap berlaku.
+
+#### Architecture consequence, bukan business logic baru
+
+Public ConversionService::preview() tetap zero-mutation, memiliki coherent read transaction sendiri dan menolak outer transaction. Initial save tidak memanggil public preview() dari write transaction. Shared semantic orchestration bersifat transaction-neutral: preview memasok coherent snapshot dependency reader/context di owned read transaction; saveInitial memasok authoritative locked dependency reader/context di owned coordinated write transaction. Jangan menduplikasi source selection, position segmentation, OD-13 classification, rule lookup, exact calculation, manifest atau fingerprint semantics; jangan melemahkan preview guard.
+
+Canonical coordination order 02C.5.1 tetap. Tidak ada schema, permission, Composer, UI, review-assessment, replacement/recalculation/replay implementation yang diotorisasi keputusan ini. OD-03–OD-13, exact arithmetic/Golden dan fixture ownership tetap; OD-07 BUSINESS PENDING dan OD-08 DEFERRED.
+
 ### Preview
 
 - Read-only dengan coherent read snapshot; tidak memerlukan coordination locks semata-mata untuk preview.
@@ -625,9 +699,9 @@ Precedence: case/rule identity/integrity → requested range/containment → OD-
 - Recheck DRAFT, not finalized, expected version.
 - Validate requested range terhadap locked case.
 - Ikuti full coordination protocol.
-- Reconstruct authoritative dependency graph server-side menggunakan current/locking reads; client calculations, selected dependency IDs, issues, dan manifest bukan authority. Expected case version dan preview fingerprint hanya preconditions.
+- Reconstruct authoritative dependency graph server-side menggunakan current/locking reads; client calculations, selected dependency IDs, issues, dan manifest bukan authority. OD-14 mewajibkan expected case version, expected dependency fingerprint, dan expected snapshot fingerprint sebagai comparison preconditions.
 - Run rule set sama dengan locked case rule set.
-- Preview fingerprint/dependency berubah → reject dan preview ulang.
+- Salah satu expected version/dependency fingerprint/snapshot fingerprint mismatch → rollback, reject dan preview ulang; saveability memakai exhaustive default-deny allowlist OD-14.
 - Persist run/lines/audit dan increment case version atomik; run.case_lock_version menyimpan resulting N+1, bukan pre-save expected N.
 - Tidak mengubah case period secara implisit.
 
@@ -778,7 +852,7 @@ Future-save lock-holder probes hanya membuktikan coordination boundary, bukan ac
 
 - Pertahankan existing bounded deadlock behavior.
 - Original request/predecessor tetap.
-- Run-specific retry/constraint handling ditetapkan eksplisit.
+- Initial-only 02C.5.2.B memakai OD-14: maksimum 3 total attempts, exact existing 40001 AND 1213 deadlock predicate saja; reconstruct seluruh authoritative state per attempt. Later lifecycle retry/constraint handling tidak diputuskan ulang di sini.
 - Jangan memakai current-source collision policy untuk constraint run.
 - Audit transaction composability sebelum top-level retry guard baru.
 
@@ -896,7 +970,7 @@ Independent processes/connections, bounded timeouts, and fresh final assertions 
 | **02C.2** | OD-03 RESOLVED; implementasi mengikuti full-month-only contract dan TC-PAK-039; coverage dan requested-range guards lulus |
 | **02C.3** | OD-04 RESOLVED; continuity-first menghasilkan assignment/provenance atau structured issues; position/proof integration dan TC-PAK-040 lulus; tidak mengimplikasikan perubahan source/schema |
 | **02C.4** | DTO final; OD-09 RESOLVED dan OD-10 schema/auth/audit mutation boundary RESOLVED; implement approved schema contract dan hanya items `[02C.4]` pada umbrella TC-PAK-041; planned executable gates `[02C.5]`/`[02C.6]` tidak memblok acceptance 02C.4 |
-| **02C.5** | Terapkan OD-10 resolved boundary dan OD-11 RESOLVED sesuai TC-PAK-042; 02C.5.2 initial-only boundary, OD-12, dan OD-13 berlaku; OD-08 tetap DEFERRED, bukan prerequisite initial-only API; review-assessment mutation di luar 02C.5.2; 02C.5.1 lengkap sebelum acceptance 02C.5.2 |
+| **02C.5** | Terapkan OD-10 resolved boundary dan OD-11 RESOLVED sesuai TC-PAK-042; 02C.5.2 initial-only boundary, OD-12/13 serta OD-14 consistency/acceptance pada TC-PAK-041 berlaku; OD-08 tetap DEFERRED, bukan prerequisite initial-only API; review-assessment mutation di luar 02C.5.2; 02C.5.1 lengkap sebelum acceptance 02C.5.2 |
 | **02C.6** | Replacement/replay final; required MariaDB races dan relevant 02A regression lulus |
 
 Tidak ada slice ketujuh. 02C.5.1/02C.5.2 hanya decomposition delivery internal.
@@ -934,6 +1008,7 @@ Tidak ada slice ketujuh. 02C.5.1/02C.5.2 hanya decomposition delivery internal.
 | OD-11 Rule validity behavior | **RESOLVED** | Explicit case rule set; known inclusive validity covers entire request; NULL = unknown; failure diagnostics-only tanpa angka/total, conditional review save; precedence dan child outcomes mengikuti section 11; executable gate 02C.5/TC-PAK-042 |
 | OD-12 Canonical LEGACY outcome | **RESOLVED** | Authoritative TMT Jabatan SK < 2023-01-01 → LEGACY_REGIME_REQUIRES_REVIEW; affected line non-numeric, parent total NULL, conditional diagnostic save; no current-rule lookup or AK Integrasi consumption; section 11 |
 | OD-13 TMT Jabatan SK evidence | **RESOLVED** | Selected same-person verified/non-superseded OD-04 history + tmt_start + nonblank sk_number/source_ref proves effective TMT Jabatan SK for regime only; insufficient proof → REGIME_EVIDENCE_REQUIRES_REVIEW; section 11 |
+| OD-14 Initial authoritative save consistency | **RESOLVED** | Exhaustive default-deny issue policy; mandatory expected case version + dependency/snapshot fingerprints; 3 attempts exact deadlock only; transaction-neutral shared orchestration, atomic initial save; section 11 / TC-PAK-041 |
 | Active source eligibility | **RESOLVED invariant** | CURRENT + OFFICIAL + ANNUAL/Q1–Q4 |
 | Requested-range containment | **RESOLVED invariant** | Valid non-empty subset/equal authoritative case period |
 | Calculation snapshot immutability | **RESOLVED invariant** | Lifecycle metadata saja yang boleh dimutasi melalui authorized service |

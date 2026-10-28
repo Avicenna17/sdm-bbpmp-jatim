@@ -988,6 +988,32 @@ UAT Phase 02 wajib mencakup TC-PAK-029–038 dan TC-PAK-006. Kasus lintas fase d
 
 OD-07 business replacement policy tetap BUSINESS PENDING dan OD-08 replay/idempotency tetap DEFERRED. OD-11 kini RESOLVED dengan executable acceptance 02C.5 pada TC-PAK-042; bukan requirement retroaktif acceptance 02C.4. Umbrella TC-PAK-041 tidak mewajibkan runtime 02C.5/02C.6 pada acceptance 02C.4.
 
+### OD-14 — planned initial-save consistency acceptance [02C.5.2.B]
+
+Bagian ini memperluas umbrella TC-PAK-041, bukan TC ID baru atau gate retroaktif 02C.4/preview 02C.5.2.A. Acuan tunggal saveability/preconditions/retry adalah [OD-14 Phase 02C plan](plans/phase-02c-resolution-conversion-runs.md#od-14--resolved-initial-authoritative-save-consistency-contract). Semua berikut planned executable acceptance, belum implementasi.
+
+- [ ] [02C.5.2.B] SOURCE_INTEGRITY_ERROR menolak save: zero run/period, case version unchanged, no committed CONVERSION_RUN_SAVED; tidak downgrade ke REQUIRES_REVIEW.
+- [ ] [02C.5.2.B] Parameterized acceptance untuk **setiap** 12 codes dalam exhaustive OD-14 allowlist: partial, tiga source, dua position dan enam rule/regime diagnostics dapat tersimpan sebagai REQUIRES_REVIEW hanya jika seluruh save gates lolos. Incomplete parent total/affected exact results NULL; tidak membuat winner/dependency/period/zero rekaan. Persist periods tepat sesuai authoritative orchestration; partial OD-03 original dates, zero periods, total NULL.
+- [ ] [02C.5.2.B] Unknown/unclassified issue dan empat rule rejection outcomes blocking; mixed allowlisted + blocking issues tidak boleh tersimpan. Authorization/inactive actor, invalid identity/range, first-use integrity, constraint/infrastructure failure tetap blocking meskipun diagnostic allowlisted.
+- [ ] [02C.5.2.B] Expected case lock version wajib; missing/invalid precondition ditolak sebelum persistence.
+- [ ] [02C.5.2.B] Expected dependency fingerprint wajib; missing/invalid precondition ditolak sebelum persistence.
+- [ ] [02C.5.2.B] Expected snapshot fingerprint wajib, bukan optional; missing/invalid precondition ditolak sebelum persistence.
+- [ ] [02C.5.2.B] Case version mismatch menghasilkan zero writes/run/period/audit dan version unchanged; wajib re-preview.
+- [ ] [02C.5.2.B] Dependency fingerprint mismatch menghasilkan rollback/zero writes dan wajib re-preview, termasuk diagnostic save.
+- [ ] [02C.5.2.B] Snapshot fingerprint mismatch dengan dependency hash yang match tetap menghasilkan rollback/zero writes dan wajib re-preview.
+- [ ] [02C.5.2.B] Kedua hashes direbuild server-side dari authoritative dependencies dan exact outputs/issues. Client selected IDs/results/issues/manifest/presentation bukan authority; persisted hashes bukan client payload. Expected values hanya comparison preconditions, bukan replay/idempotency keys.
+- [ ] [02C.5.2.B] Exact existing underlying QueryException SQLSTATE 40001 AND vendor 1213 boleh retry sampai **3 total attempts**, termasuk existing Laravel DeadlockException wrapper. Tidak memperluas predicate.
+- [ ] [02C.5.2.B] Tiap retry mengulang case/Person/RuleSet/master locks, existing-run guard, evaluation/history current reads, orchestration/calculation, kedua hashes, preconditions/saveability, persistence/version/audit. Fault-injection membuktikan authoritative state direconstruct dan tidak memakai models/operands/results/manifests/IDs dari attempt sebelumnya.
+- [ ] [02C.5.2.B] Exhaustion attempt ketiga meninggalkan zero partial writes, case version unchanged dan no committed event; sanitized technical/infrastructure failure, bukan diagnostic run/business issue baru.
+- [ ] [02C.5.2.B] Non-approved errors tidak retry: stale version/either hash, existing run, authorization/inactive actor, source/rule integrity, validation, unique conflict/vendor 1062 (termasuk SKP-specific collision), nonmatching lock-wait timeout, arbitrary SQL/database error, audit/domain failure. SQLSTATE/vendor pair yang hanya cocok salah satunya tidak retry.
+- [ ] [02C.5.2.B] ANY existing run menolak initial save, termasuk PREVIEW, REQUIRES_REVIEW, hanya SUPERSEDED/inactive projection dan revision history. Tidak return existing success, allocate next revision, replay atau replace; successful first run selalu revision 1, predecessor/reason NULL.
+- [ ] [02C.5.2.B] Successful initial save menghasilkan tepat satu CONVERSION_RUN_SAVED, subject PakConversionRun/case reference, tanpa period/later-lifecycle event; retry tidak menggandakan event.
+- [ ] [02C.5.2.B] Audit failure rollback run, periods dan case increment. Successful run sejak creation menyimpan N+1, case berubah tepat sekali N → N+1; tidak patch immutable run kemudian. Required first_used_at tetap unchanged; missing/inconsistent marker blocking tanpa repair/backfill.
+- [ ] [02C.5.2.B] Shared transaction-neutral orchestration mempertahankan source/position/OD-13/rule/calculator/manifest/hash semantics. Save tidak memanggil public preview dalam write transaction; preview tetap menolak outer transaction, coherent dan zero-mutation.
+- [ ] [02C.5.2.B] Nurmaulida TC-PAK-001/037 tetap numeric-only tanpa SK/history/level provenance rekaan. Full documentary save integration memakai fixture terpisah yang eksplisit synthetic/non-real; boleh membuktikan persisted exact lines 25/6, 25/1, 25/1, 125/6 dan total 75/1 tanpa AK Dasar double counting.
+
+OD-07 BUSINESS PENDING dan OD-08 DEFERRED tetap; acceptance ini tidak menambah replacement/replay/recalculation/review-assessment scope.
+
 ## TC-PAK-042 — OD-11 explicit rule validity dan numeric orchestration
 
 **Ownership: Phase 02C.5.** Planned acceptance berdasarkan OD-11 RESOLVED, BR-AUDIT-001, dan section 11 Phase 02C plan. Ini dokumentasi acceptance, bukan executable test atau klaim implementasi tersedia; tidak menambah gate 02C.4.
