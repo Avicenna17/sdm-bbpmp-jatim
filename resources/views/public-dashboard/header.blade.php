@@ -4,8 +4,8 @@
 
                 <!-- Logo & Brand Title -->
                 <div class="flex items-center gap-3.5">
-                    <div class="flex-shrink-0 w-13 h-13 rounded-xl bg-gradient-to-br from-blue-900 via-blue-800 to-sky-600 p-0.5 shadow-md shadow-blue-900/10 flex items-center justify-center">
-                        <div class="w-full h-full bg-blue-950 rounded-[10px] flex items-center justify-center">
+                    <div class="flex-shrink-0 w-13 h-13 rounded-xl  p-0.5 shadow-blue-900/10 flex items-center justify-center">
+                        <div class="w-full h-full bg-white rounded-[10px] flex items-center justify-center">
                             <!-- Kemendikdasmen / BBPMP Emblem Icon -->
                             <img src="{{ asset('images/bbpmp.png') }}" alt="Logo BBPMP Jatim" class="h-12 sm:h-14 w-auto object-contain" />
                         </div>

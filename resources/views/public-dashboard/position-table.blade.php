@@ -6,13 +6,11 @@
             <div class="flex items-start gap-3.5">
                 <div class="flex-shrink-0 w-11 h-11 rounded-xl {{ $icon === 'bbpmp' ? 'bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-amber-400' : 'bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-sky-400' }} p-2.5 shadow-md flex items-center justify-center">
                     @if($icon === 'bbpmp')
-                        <!-- Balai / Emblem Icon -->
                         <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2L1 7l11 5 9-4.09V17h2V7L12 2z"/>
                             <path d="M4.5 10.5v5.88c0 3.12 3.36 5.62 7.5 5.62s7.5-2.5 7.5-5.62v-5.88l-7.5 3.41-7.5-3.41z" opacity="0.85"/>
                         </svg>
                     @else
-                        <!-- Bagian Umum / Office Icon -->
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                         </svg>
@@ -31,19 +29,18 @@
                         {{ $title }}
                     </h3>
                     <p class="text-xs sm:text-sm text-slate-500 mt-1">
-                        Daftar lengkap formasi jabatan, beban pemangku saat ini, proyeksi kebutuhan, dan selisih formasi.
+                        Daftar lengkap formasi jabatan, beban bezetting saat ini, proyeksi kebutuhan, dan selisih formasi.
                     </p>
                 </div>
             </div>
 
-            <!-- Stats Pill Summary -->
             <div class="flex flex-wrap items-center gap-2 self-start lg:self-center">
                 <div class="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 shadow-2xs flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
                     <span><strong>{{ count($peta['top']) }}</strong> Formasi</span>
                 </div>
                 <div class="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-xs font-bold text-blue-900 shadow-2xs flex items-center gap-1.5">
-                    <span><strong>{{ number_format($peta['incumbents'], 0, ',', '.') }}</strong> Pemangku</span>
+                    <span><strong>{{ number_format($peta['incumbents'], 0, ',', '.') }}</strong> Bezetting</span>
                 </div>
                 <div class="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-xs font-bold text-amber-900 shadow-2xs flex items-center gap-1.5">
                     <span><strong>{{ number_format($peta['requirements'], 0, ',', '.') }}</strong> Kebutuhan</span>
@@ -52,7 +49,6 @@
         </div>
     </div>
 
-    <!-- Table Container with Horizontal and Vertical Scrolling -->
     <div class="overflow-x-auto overflow-y-auto max-h-[640px] focus:outline-none" tabindex="0" role="region" aria-label="{{ $title }}">
         <table class="w-full text-sm text-left border-collapse">
             <thead class="sticky top-0 z-20 bg-slate-100/95 backdrop-blur-md text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-200 shadow-2xs">
@@ -61,10 +57,10 @@
                     <th scope="col" class="px-4 py-3.5 min-w-72">Nama / Formasi Jabatan</th>
                     <th scope="col" class="px-4 py-3.5 text-center w-36">Jenis</th>
                     <th scope="col" class="px-4 py-3.5 text-center w-24">Kelas</th>
-                    <th scope="col" class="px-4 py-3.5 text-center w-28 text-blue-950">Pemangku</th>
-                    <th scope="col" class="px-4 py-3.5 text-center w-28 text-slate-800">Kebutuhan</th>
-                    <th scope="col" class="px-4 py-3.5 text-center w-28 text-amber-900">Kosong</th>
-                    <th scope="col" class="px-4 py-3.5 text-center w-44">Selisih (Pemangku − Kebutuhan)</th>
+                    <th scope="col" class="px-4 py-3.5 text-center w-28 text-blue-950" title="Jumlah pegawai Bezettingformasi saat ini">Bezetting</th>
+                    <th scope="col" class="px-4 py-3.5 text-center w-28 text-slate-800" title="Jumlah kebutuhan formasi berdasarkan Analisis Beban Kerja (ABK)">Kebutuhan</th>
+                    <th scope="col" class="px-4 py-3.5 text-center w-28 text-amber-900" title="Formasi yang masih kosong/belum terisi Bezetting">Kosong</th>
+                    <th scope="col" class="px-4 py-3.5 text-center w-44" title="Selisih = Bezetting dikurangi Kebutuhan. Minus (-) berarti kekurangan, Plus (+) berarti kelebihan">Selisih (Bezetting − Kebutuhan)</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 bg-white">
@@ -108,7 +104,7 @@
                             @endif
                         </td>
 
-                        <!-- Pemangku -->
+                        <!-- Bezetting -->
                         <td class="px-4 py-3 text-center">
                             <span class="inline-flex items-center justify-center min-w-8 px-2.5 py-1 rounded-lg bg-blue-50/80 text-blue-950 font-bold text-xs border border-blue-100 group-hover:bg-blue-100 transition-colors">
                                 {{ $row['incumbents'] ?? '-' }}
@@ -139,23 +135,17 @@
                                 <span class="text-xs text-slate-400">-</span>
                             @elseif($selisih < 0)
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80 shadow-2xs" title="Kekurangan formasi: {{ abs($selisih) }}">
-                                    <svg class="w-3 h-3 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
-                                    </svg>
                                     <span>{{ $selisih }}</span>
                                     <span class="sr-only">(Kurang)</span>
                                 </span>
                             @elseif($selisih > 0)
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs" title="Kelebihan formasi: +{{ $selisih }}">
-                                    <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
-                                    </svg>
                                     <span>+{{ $selisih }}</span>
                                     <span class="sr-only">(Lebih)</span>
                                 </span>
                             @else
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200/60" title="Formasi terpenuhi seimbang">
-                                    0 (Pas)
+                                    0 (Penuh)
                                 </span>
                             @endif
                         </td>

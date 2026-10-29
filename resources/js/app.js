@@ -103,8 +103,12 @@ async function refreshDashboard(url) {
         const focusValue = focused?.value;
         const selection = focused?.type === 'search' ? [focused.selectionStart, focused.selectionEnd] : null;
         const scroll = [window.scrollX, window.scrollY];
+        const activeFormationTab = main.querySelector('[data-formation-tab][aria-selected="true"]')?.dataset.formationTab;
         for (const canvas of main.querySelectorAll('[data-public-chart]')) Chart.getChart(canvas)?.destroy();
         main.replaceWith(replacement);
+        if (activeFormationTab && activeFormationTab !== 'kepala-bbpmp') {
+            switchFormationTab(activeFormationTab, replacement);
+        }
         const periodBadge = document.querySelector('[data-public-period]');
         if (periodBadge) periodBadge.textContent = page.querySelector('[data-public-period]')?.textContent ?? '';
         history.replaceState(null, '', url);
@@ -120,6 +124,29 @@ async function refreshDashboard(url) {
     } finally {
         if (requestRevision === revision) document.querySelector('#main')?.removeAttribute('aria-busy');
     }
+}
+function switchFormationTab(targetId, container = document) {
+    const tabContainer = container.querySelector('[data-formation-container]') || container;
+    tabContainer.querySelectorAll('[data-formation-tab]').forEach(btn => {
+        const isActive = btn.dataset.formationTab === targetId;
+        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        const dot = btn.querySelector('.tab-dot');
+        if (isActive) {
+            btn.className = 'tab-btn inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-900 shadow-2xs border border-slate-200/80 transition-all cursor-pointer';
+            if (dot) dot.className = 'tab-dot w-2 h-2 rounded-full bg-blue-600 transition-colors';
+        } else {
+            btn.className = 'tab-btn inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 border border-transparent transition-all cursor-pointer';
+            if (dot) dot.className = 'tab-dot w-2 h-2 rounded-full bg-slate-400 transition-colors';
+        }
+    });
+
+    tabContainer.querySelectorAll('[data-formation-panel]').forEach(panel => {
+        if (panel.dataset.formationPanel === targetId) {
+            panel.classList.remove('hidden');
+        } else {
+            panel.classList.add('hidden');
+        }
+    });
 }
 function applyForm(form) {
     const url = new URL(form.action);
@@ -142,6 +169,12 @@ document.addEventListener('input', event => {
     searchTimer = setTimeout(() => applyForm(event.target.form), 400);
 });
 document.addEventListener('click', event => {
+    const tabBtn = event.target.closest('[data-formation-tab]');
+    if (tabBtn) {
+        event.preventDefault();
+        switchFormationTab(tabBtn.dataset.formationTab, tabBtn.closest('[data-formation-container]') || document);
+        return;
+    }
     const link = event.target.closest('[data-filter-reset]');
     if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
     event.preventDefault();
