@@ -2,6 +2,8 @@
 
 // Test-only process entrypoint. Credentials arrive on stdin and are never returned.
 use App\Domain\Import\ImportService;
+use App\Domain\Pak\DTOs\ConversionSaveRequest;
+use App\Domain\Pak\Services\ConversionService;
 use App\Domain\Pak\Services\EmployeeHistoryService;
 use App\Domain\Pak\Services\FunctionalMasterService;
 use App\Domain\Pak\Services\PakCaseService;
@@ -32,6 +34,14 @@ config(['database.default' => 'mysql', 'database.connections.mysql' => $input['d
     'filesystems.disks.local' => ['driver' => 'local', 'root' => $input['root'], 'visibility' => 'private', 'throw' => false]]);
 Connection::resolverFor('mysql', fn ($pdo, $database, $prefix, $config) => new ConcurrencyConnection($pdo, $database, $prefix, $config));
 DB::purge('mysql');
+if ($input['operation'] === 'conversion') {
+    if (getenv('PAK_CONCURRENCY') !== '1' || getenv('PAK_DISPOSABLE_DB') !== 'pak_02a1_test'
+        || (int) $input['db']['port'] !== 33318
+        || DB::selectOne('SELECT DATABASE() AS db')->db !== 'pak_02a1_test'
+        || ! str_starts_with(DB::selectOne('SELECT VERSION() AS v')->v, '10.5.11-MariaDB')) {
+        throw new RuntimeException('Verified disposable MariaDB required.');
+    }
+}
 DB::statement('SET SESSION innodb_lock_wait_timeout = 10');
 $connectionId = (int) DB::selectOne('SELECT CONNECTION_ID() AS id')->id;
 $signal = function (string $name) use ($input): void {
@@ -69,7 +79,15 @@ $result = ['success' => false, 'issue_code' => null, 'batch_id' => $input['batch
     'status' => null, 'evaluation_id' => null, 'connection_id' => $connectionId, 'pid' => getmypid()];
 try {
     $actor = User::findOrFail($input['actor']);
-    if ($input['operation'] === 'commit') {
+    if ($input['operation'] === 'conversion') {
+        $result['attempts'] = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$result) {
+            $result['attempts']++;
+        });
+        $run = app(ConversionService::class)->saveInitial($actor, ConversionSaveRequest::from($input['request']));
+        $result['run_id'] = $run->id;
+        $result['status'] = $run->status->value;
+    } elseif ($input['operation'] === 'commit') {
         $batch = app(SkpImportCommitService::class)->commit($actor, $input['batch_id']);
         $result += ['committed_by' => $batch->committed_by, 'committed_at' => $batch->committed_at->format('Y-m-d H:i:s'),
             'summary' => $batch->summary, 'rows' => $batch->rows()->orderBy('record_ordinal')->get()->map(fn ($row) => ['id' => $row->id, 'status' => $row->processing_status->value, 'evaluation_id' => $row->performance_evaluation_id])->all()];
@@ -100,8 +118,14 @@ try {
     }
     $result['success'] = true;
 } catch (Throwable $error) {
-    $result['issue_code'] = $error instanceof ValidationException ? (array_values($error->errors())[0][0] ?? 'VALIDATION_FAILED')
-        : ($error->issue_code ?? 'UNEXPECTED_FAILURE');
+    $result['issue_code'] = $input['operation'] === 'conversion'
+        ? ($error instanceof ValidationException ? 'VALIDATION_FAILED' : 'UNEXPECTED_FAILURE')
+        : ($error instanceof ValidationException ? (array_values($error->errors())[0][0] ?? 'VALIDATION_FAILED')
+            : ($error->issue_code ?? 'UNEXPECTED_FAILURE'));
+}
+if ($input['operation'] === 'conversion') {
+    $result['transaction_level'] = DB::transactionLevel();
+    $result['pdo_active'] = DB::connection()->getPdo()->inTransaction();
 }
 $result['diagnostics'] = ConcurrencyConnection::$diagnostics;
 echo json_encode($result, JSON_THROW_ON_ERROR).PHP_EOL;
