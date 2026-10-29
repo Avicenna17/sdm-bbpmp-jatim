@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 /** Evidence reader only. Selection algorithms remain in the accepted resolvers. */
-final class ConversionPreviewDependencies implements ConversionDependencyReader
+class ConversionPreviewDependencies implements ConversionDependencyReader
 {
     public function case(int $id): PakCase
     {
@@ -70,8 +70,8 @@ final class ConversionPreviewDependencies implements ConversionDependencyReader
     {
         $sources = [];
         foreach ($coverage->year_partitions as $partition) {
-            $rows = PerformanceEvaluation::where('person_id', $personId)->where('performance_year', $partition->year)
-                ->where('status', 'CURRENT')->where('source_kind', 'OFFICIAL')->whereIn('evaluation_type', ['ANNUAL', 'Q1', 'Q2', 'Q3', 'Q4'])->orderBy('id')->get();
+            $rows = $this->sourceCandidates(fn ($query) => $query->where('person_id', $personId)->where('performance_year', $partition->year)
+                ->where('status', 'CURRENT')->where('source_kind', 'OFFICIAL')->whereIn('evaluation_type', ['ANNUAL', 'Q1', 'Q2', 'Q3', 'Q4'])->orderBy('id'));
             foreach ($rows as $row) {
                 if ($row->evaluation_type->value !== 'ANNUAL' && (((int) substr($row->evaluation_type->value, 1) - 1) * 3 + 1) > $partition->end_month) {
                     continue;
@@ -83,17 +83,23 @@ final class ConversionPreviewDependencies implements ConversionDependencyReader
         }
         // Explicit requested proof IDs remain in source evidence. Never expose a foreign target.
         // Keep same-person candidates complete; proof selection belongs to the source resolver.
-        $rows = EmployeePositionHistory::where('person_id', $personId)->orderBy('id')->get();
+        $rows = $this->historyCandidates(fn ($query) => $query->where('person_id', $personId)->orderBy('id'));
         $histories = [];
         foreach ($rows as $row) {
             $histories[] = $this->fields($row, ['id', 'person_id', 'tmt_start', 'tmt_end', 'position_type', 'position_name', 'functional_position_id', 'functional_level_id',
                 'sk_number', 'sk_date', 'source', 'source_ref', 'verified_by', 'verified_at', 'superseded_at', 'supersedes_id']);
         }
-        $levels = FunctionalLevel::whereIn('id', array_filter(array_column($histories, 'functional_level_id')))->orderBy('id')->get()
+        $levels = $this->masterRows(FunctionalLevel::class, array_filter(array_column($histories, 'functional_level_id')))
             ->map(fn ($row) => $this->fields($row, ['id', 'functional_category_id', 'code', 'name', 'is_active']))->all();
-        $positions = FunctionalPosition::whereIn('id', array_filter(array_column($histories, 'functional_position_id')))->orderBy('id')->get()
+        $positions = $this->masterRows(FunctionalPosition::class, array_filter(array_column($histories, 'functional_position_id')))
             ->map(fn ($row) => $this->fields($row, ['id', 'code', 'name', 'is_active']))->all();
 
         return ['sources' => $sources, 'histories' => $histories, 'levels' => $levels, 'positions' => $positions];
+    }
+
+    /** Internal evidence reads; save supplies already coordinated master rows. */
+    protected function masterRows(string $class, array $ids): Collection
+    {
+        return $class::whereIn('id', $ids)->orderBy('id')->get();
     }
 }
