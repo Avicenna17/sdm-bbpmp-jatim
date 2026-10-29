@@ -2,6 +2,7 @@
 
 namespace App\Domain\Pak\Services;
 
+use App\Support\Database\MySqlDeadlock;
 use Illuminate\Database\DeadlockException;
 use Illuminate\Database\QueryException;
 use Throwable;
@@ -32,11 +33,7 @@ final class SkpCommitRetryPolicy
 
     public function allowsDeadlock(Throwable $error): bool
     {
-        $error = $this->underlying($error);
-
-        return $error instanceof QueryException
-            && ($error->errorInfo[0] ?? null) === '40001'
-            && (int) ($error->errorInfo[1] ?? 0) === 1213;
+        return MySqlDeadlock::allows($error);
     }
 
     private function underlying(Throwable $error): Throwable

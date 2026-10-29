@@ -14,11 +14,13 @@ use App\Models\PakConversionPeriod;
 use App\Models\PakConversionRun;
 use App\Models\PakRuleSet;
 use App\Models\User;
+use App\Support\Database\MySqlDeadlock;
 use App\Support\Database\PersonLocks;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use LogicException;
+use Throwable;
 
 final class ConversionService
 {
@@ -38,18 +40,44 @@ final class ConversionService
         return $connection->transaction(fn () => app(ConversionOrchestrator::class)->build($request, app(ConversionPreviewDependencies::class)));
     }
 
-    /** One atomic attempt. B.3 owns any future retry wrapper. */
     public function saveInitial(User $actor, ConversionSaveRequest $request): PakConversionRun
+    {
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $rolledBack = false;
+            try {
+                return $this->saveInitialAttempt($actor, $request, $rolledBack);
+            } catch (Throwable $error) {
+                if (! $rolledBack || ! MySqlDeadlock::allows($error)) {
+                    throw $error;
+                }
+                if ($attempt === 3) {
+                    throw ValidationException::withMessages(['conversion' => 'CONCURRENCY_RETRY_EXHAUSTED']);
+                }
+            }
+        }
+    }
+
+    /** The flag carries cleanup proof only; no dependency state escapes a failed attempt. */
+    private function saveInitialAttempt(User $actor, ConversionSaveRequest $request, bool &$rolledBack): PakConversionRun
     {
         $connection = DB::connection();
         $this->requireTopLevel($connection);
         foreach (self::PERMISSIONS as $permission) {
             Access::authorize($actor, $permission);
         }
+        if ($connection->getPdo()->inTransaction()) {
+            throw new LogicException('Conversion save requires an inactive PDO transaction.');
+        }
         $plan = ConversionSaveDependencies::discover($request->pak_case_id);
         $this->requireTopLevel($connection);
 
-        return $connection->transaction(function () use ($actor, $request, $plan) {
+        $pdo = $connection->getPdo();
+        if ($pdo->inTransaction()) {
+            throw new LogicException('Conversion save requires an inactive PDO transaction.');
+        }
+        $commitStarted = false;
+        try {
+            $connection->beginTransaction();
             $case = PakCase::lockForUpdate()->findOrFail($request->pak_case_id);
             if ($case->status !== 'DRAFT' || $case->finalized_at !== null || $case->lock_version !== $request->expected_case_lock_version) {
                 throw ValidationException::withMessages(['case' => 'Draft changed or locked. Obtain a new preview.']);
@@ -119,8 +147,29 @@ final class ConversionService
                 'issue_codes' => array_values(array_unique(array_column($result->issues, 'issue_code'))),
             ]], $case->id);
 
+            $commitStarted = true;
+            $connection->commit();
+
             return $run;
-        });
+        } catch (Throwable $error) {
+            // commit() retains Laravel ownership if its pre-commit event/PDO call throws.
+            // An inactive PDO after entering commit cannot prove the commit failed.
+            try {
+                $level = $connection->transactionLevel();
+                $active = $pdo->inTransaction();
+                if ($level > 0) {
+                    $connection->rollBack(0);
+                }
+                if ($connection->transactionLevel() !== 0 || $pdo->inTransaction()) {
+                    throw new LogicException('Conversion save transaction cleanup failed.');
+                }
+                $rolledBack = $level > 0 && (! $commitStarted || $active);
+            } catch (Throwable $cleanupError) {
+                throw new LogicException('Conversion save transaction cleanup failed; retry is unsafe.', 0, $cleanupError);
+            }
+
+            throw $error;
+        }
     }
 
     private function requireTopLevel(Connection $connection): void

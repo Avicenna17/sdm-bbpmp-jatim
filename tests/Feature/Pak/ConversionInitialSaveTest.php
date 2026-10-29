@@ -22,6 +22,9 @@ use App\Models\PerformanceEvaluation;
 use App\Models\PerformancePredicateRule;
 use App\Models\Person;
 use App\Models\User;
+use Illuminate\Database\Events\TransactionCommitted;
+use Illuminate\Database\Events\TransactionCommitting;
+use Illuminate\Database\Events\TransactionRolledBack;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Grammars\SQLiteGrammar;
 use Illuminate\Database\QueryException;
@@ -116,6 +119,9 @@ class ConversionInitialSaveTest extends TestCase
         $this->assertSame(0, PakEvent::where('event_code', 'CONVERSION_RUN_SAVED')->count());
         $this->assertSame($this->case->lock_version, $this->case->fresh()->lock_version);
         $this->assertSame(0, DB::transactionLevel());
+        $this->assertFalse(DB::connection()->getPdo()->inTransaction());
+        $this->assertCount(0, app('db.transactions')->getPendingTransactions());
+        $this->assertCount(0, app('db.transactions')->getCommittedTransactions());
     }
 
     public function test_synthetic_save_preserves_exact_results_version_hashes_and_first_use(): void
@@ -153,10 +159,15 @@ class ConversionInitialSaveTest extends TestCase
     {
         $data = get_object_vars($this->request());
         $data[$field] = $field === 'expected_case_lock_version' ? $data[$field] + 1 : str_repeat('0', 64);
+        $attempts = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts) {
+            $attempts++;
+        });
         try {
             $this->save(ConversionSaveRequest::from($data));
             $this->fail('Stale precondition accepted');
         } catch (ValidationException) {
+            $this->assertSame(1, $attempts);
             $this->assertEmptySave();
         }
     }
@@ -222,6 +233,11 @@ class ConversionInitialSaveTest extends TestCase
     public function test_fault_rolls_back_all_state_without_retry(string $table): void
     {
         $request = $this->request();
+        $marker = $this->rule->fresh()->getRawOriginal('first_used_at');
+        $attempts = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts) {
+            $attempts++;
+        });
         $hits = 0;
         DB::listen(function ($event) use ($table, &$hits) {
             if ((str_starts_with($event->sql, 'insert into') || str_starts_with($event->sql, 'update')) && str_contains($event->sql, '"'.$table.'"')) {
@@ -234,6 +250,8 @@ class ConversionInitialSaveTest extends TestCase
             $this->fail('Fault must escape');
         } catch (\RuntimeException $e) {
             $this->assertSame('Synthetic write fault', $e->getMessage());
+            $this->assertSame(1, $attempts);
+            $this->assertSame($marker, $this->rule->fresh()->getRawOriginal('first_used_at'));
             $this->assertSame(1, $hits);
             $this->assertEmptySave();
         }
@@ -250,10 +268,15 @@ class ConversionInitialSaveTest extends TestCase
         $run = $this->save();
         DB::table('pak_conversion_runs')->where('id', $run->id)->update(['status' => $status, 'active_case_id' => $status === 'SUPERSEDED' ? null : $this->case->id]);
         $request = $this->request();
+        $attempts = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts) {
+            $attempts++;
+        });
         try {
             $this->save($request);
             $this->fail('Existing history accepted');
         } catch (ValidationException) {
+            $this->assertSame(1, $attempts);
             $this->assertSame(1, PakConversionRun::count());
             $this->assertSame(4, PakConversionPeriod::count());
             $this->assertSame($run->case_lock_version, $this->case->fresh()->lock_version);
@@ -398,6 +421,10 @@ class ConversionInitialSaveTest extends TestCase
     public function test_changed_master_lock_plan_fails_without_late_master_acquisition(): void
     {
         $request = $this->request();
+        $attempts = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts) {
+            $attempts++;
+        });
         $newLevel = FunctionalLevel::create(['functional_category_id' => $this->level->functional_category_id, 'code' => 'NEW', 'name' => 'Synthetic new dependency']);
         $armed = true;
         DB::listen(function ($q) use (&$armed, $newLevel) {
@@ -410,6 +437,7 @@ class ConversionInitialSaveTest extends TestCase
             $this->save($request);
             $this->fail('Changed plan accepted');
         } catch (ValidationException $e) {
+            $this->assertSame(1, $attempts);
             $this->assertArrayHasKey('snapshot', $e->errors());
             $this->assertEmptySave();
             $this->assertSame($this->level->id, $this->history->fresh()->functional_level_id);
@@ -519,15 +547,225 @@ class ConversionInitialSaveTest extends TestCase
         $this->assertSame(0, FunctionalPositionLevel::count());
     }
 
+    private function exactDeadlock(): QueryException
+    {
+        $error = new \PDOException('Synthetic approved deadlock');
+        $error->errorInfo = ['40001', 1213, 'Synthetic approved deadlock'];
+
+        return new QueryException('sqlite', 'synthetic', [], $error);
+    }
+
+    public function test_committing_exception_cleans_laravel_pdo_and_manager(): void
+    {
+        $request = $this->request();
+        $callbacks = 0;
+        $commits = 0;
+        $marker = $this->rule->fresh()->getRawOriginal('first_used_at');
+        PakEvent::created(function ($event) use (&$callbacks) {
+            if ($event->event_code === 'CONVERSION_RUN_SAVED') {
+                DB::afterCommit(function () use (&$callbacks) {
+                    $callbacks++;
+                });
+            }
+        });
+        $dispatcher = DB::connection()->getEventDispatcher();
+        $dispatcher->listen(TransactionCommitting::class, function () use (&$commits) {
+            $commits++;
+            $this->assertSame(1, DB::transactionLevel());
+            $this->assertTrue(DB::connection()->getPdo()->inTransaction());
+            $this->assertSame(1, PakConversionRun::count());
+            $this->assertSame(4, PakConversionPeriod::count());
+            $this->assertSame($this->case->lock_version + 1, $this->case->fresh()->lock_version);
+            $this->assertSame(1, PakEvent::where('event_code', 'CONVERSION_RUN_SAVED')->count());
+            throw $this->exactDeadlock();
+        });
+        try {
+            $this->save($request);
+            $this->fail('Commit fault swallowed');
+        } catch (ValidationException $e) {
+            $this->assertSame(['CONCURRENCY_RETRY_EXHAUSTED'], $e->errors()['conversion']);
+            $this->assertSame(3, $commits);
+            $this->assertEmptySave();
+            $this->assertSame(0, $callbacks, 'Rolled-back after-commit callback must be discarded');
+            $this->assertSame($marker, $this->rule->fresh()->getRawOriginal('first_used_at'));
+        } finally {
+            $dispatcher->forget(TransactionCommitting::class);
+        }
+        $this->assertSame('75', $this->save($request)->total_numerator);
+        $this->assertSame(1, $callbacks, 'Only the subsequent successful transaction callback runs');
+        $this->assertSame(0, DB::transactionLevel());
+        $this->assertFalse(DB::connection()->getPdo()->inTransaction());
+    }
+
+    public static function postCommitFaults(): array
+    {
+        return [['event'], ['callback'], ['pdo_committed_then_error']];
+    }
+
+    #[DataProvider('postCommitFaults')]
+    public function test_post_commit_deadlock_shape_is_never_retried(string $seam): void
+    {
+        $request = $this->request();
+        $attempts = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts) {
+            $attempts++;
+        });
+        $fault = function () {
+            throw $this->exactDeadlock();
+        };
+        $dispatcher = DB::connection()->getEventDispatcher();
+        if ($seam === 'pdo_committed_then_error') {
+            $dispatcher->listen(TransactionCommitting::class, function () use ($fault) {
+                // Test-only simulation: PDO commits, then control throws before Laravel bookkeeping.
+                DB::connection()->getPdo()->commit();
+                $fault();
+            });
+        } elseif ($seam === 'event') {
+            $dispatcher->listen(TransactionCommitted::class, $fault);
+        } else {
+            PakEvent::created(function ($event) use ($fault) {
+                if ($event->event_code === 'CONVERSION_RUN_SAVED') {
+                    DB::afterCommit($fault);
+                }
+            });
+        }
+        try {
+            $this->save($request);
+            $this->fail('Post-commit fault swallowed');
+        } catch (QueryException) {
+            $this->assertSame(1, $attempts);
+            $this->assertSame(1, PakConversionRun::count());
+            $this->assertSame(4, PakConversionPeriod::count());
+            $this->assertSame($this->case->lock_version + 1, $this->case->fresh()->lock_version);
+            $this->assertSame(1, PakEvent::where('event_code', 'CONVERSION_RUN_SAVED')->count());
+            $this->assertSame(0, DB::transactionLevel());
+            $this->assertFalse(DB::connection()->getPdo()->inTransaction());
+            $this->assertCount(0, app('db.transactions')->getPendingTransactions());
+            $this->assertCount(0, app('db.transactions')->getCommittedTransactions());
+        } finally {
+            $dispatcher->forget(TransactionCommitted::class);
+            $dispatcher->forget(TransactionCommitting::class);
+        }
+    }
+
+    public static function retryCounts(): array
+    {
+        return [[0], [1], [2], [3]];
+    }
+
+    #[DataProvider('retryCounts')]
+    public function test_exact_deadlocks_after_audit_retry_fresh_clean_attempts(int $failures): void
+    {
+        $request = $this->request();
+        $originalRequest = get_object_vars($request);
+        $marker = $this->rule->fresh()->getRawOriginal('first_used_at');
+        $attempts = $events = $callbacks = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts) {
+            $this->assertEmptySave();
+            $attempts++;
+        });
+        PakEvent::created(function ($event) use (&$events, &$callbacks, $failures) {
+            if ($event->event_code !== 'CONVERSION_RUN_SAVED') {
+                return;
+            }
+            $events++;
+            $this->assertSame(1, PakConversionRun::count());
+            $this->assertSame(4, PakConversionPeriod::count());
+            $this->assertSame($this->case->lock_version + 1, $this->case->fresh()->lock_version);
+            DB::afterCommit(function () use (&$callbacks) {
+                $callbacks++;
+            });
+            if ($events <= $failures) {
+                throw $this->exactDeadlock();
+            }
+        });
+        try {
+            $run = $this->save($request);
+            $this->assertLessThan(3, $failures);
+            $this->assertSame('75/1', $run->total_numerator.'/'.$run->total_denominator);
+            $this->assertSame(1, PakConversionRun::count());
+            $this->assertSame(4, PakConversionPeriod::count());
+            $this->assertSame(1, PakEvent::where('event_code', 'CONVERSION_RUN_SAVED')->count());
+            $this->assertSame(1, $callbacks);
+        } catch (ValidationException $e) {
+            $this->assertSame(3, $failures);
+            $this->assertSame(['CONCURRENCY_RETRY_EXHAUSTED'], $e->errors()['conversion']);
+            $this->assertEmptySave();
+            $this->assertSame(0, $callbacks);
+        }
+        $this->assertSame(min($failures + 1, 3), $attempts);
+        $this->assertSame($attempts, $events);
+        $this->assertSame($originalRequest, get_object_vars($request));
+        $this->assertSame($marker, $this->rule->fresh()->getRawOriginal('first_used_at'));
+        $this->assertSame(0, DB::transactionLevel());
+        $this->assertFalse(DB::connection()->getPdo()->inTransaction());
+        $this->assertCount(0, app('db.transactions')->getPendingTransactions());
+        $this->assertCount(0, app('db.transactions')->getCommittedTransactions());
+    }
+
+    public function test_retry_rediscovers_and_rebuilds_then_stale_failure_stops(): void
+    {
+        $request = $this->request();
+        $originalRequest = get_object_vars($request);
+        $attempts = $discoveries = $audits = 0;
+        $orchestrations = [];
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts) {
+            $attempts++;
+        });
+        DB::listen(function ($query) use (&$discoveries, &$orchestrations, &$attempts) {
+            if (DB::transactionLevel() === 0 && str_starts_with($query->sql, 'select "person_id" from "pak_cases"')) {
+                $discoveries++;
+            }
+            if (DB::transactionLevel() === 1 && str_contains($query->sql, 'from "performance_predicate_rules"') && str_contains($query->sql, '"predicate_code" =')) {
+                $orchestrations[$attempts] = ($orchestrations[$attempts] ?? 0) + 1;
+            }
+        });
+        PakEvent::created(function ($event) use (&$audits) {
+            if ($event->event_code === 'CONVERSION_RUN_SAVED' && ++$audits === 1) {
+                throw $this->exactDeadlock();
+            }
+        });
+        $changed = false;
+        $dispatcher = DB::connection()->getEventDispatcher();
+        $dispatcher->listen(TransactionRolledBack::class, function () use (&$changed) {
+            if (! $changed) {
+                $changed = true;
+                $this->assertEmptySave();
+                // Committed test seam between attempts; deliberately changes OD-13 evidence.
+                DB::table('employee_position_histories')->where('id', $this->history->id)->update(['source_ref' => 'Synthetic changed evidence between attempts']);
+            }
+        });
+        try {
+            $this->save($request);
+            $this->fail('Stale original request accepted');
+        } catch (ValidationException $e) {
+            $this->assertSame(['Dependencies or calculation changed. Obtain a new preview.'], $e->errors()['snapshot']);
+            $this->assertSame(2, $attempts);
+            $this->assertSame(2, $discoveries);
+            $this->assertSame([1, 2], array_keys($orchestrations));
+            $this->assertGreaterThan(0, $orchestrations[1]);
+            $this->assertSame($orchestrations[1], $orchestrations[2]);
+            $this->assertSame(1, $audits);
+            $this->assertSame($originalRequest, get_object_vars($request));
+            $this->assertEmptySave();
+        } finally {
+            $dispatcher->forget(TransactionRolledBack::class);
+        }
+    }
+
     public static function sqlFaults(): array
     {
-        return [['40001', 1213], ['23000', 1062]];
+        return [['23000', 1062], ['40001', 1062], ['40001', 1205], ['HY000', 1213], ['HY000', 1205], ['HY000', 2006], ['42000', 1064]];
     }
 
     #[DataProvider('sqlFaults')]
-    public function test_database_error_is_not_retried_in_b2(string $state, int $vendor): void
+    public function test_nonapproved_database_error_is_not_retried(string $state, int $vendor): void
     {
         $request = $this->request();
+        $attempts = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts) {
+            $attempts++;
+        });
         $hits = 0;
         DB::listen(function ($q) use (&$hits, $state, $vendor) {
             if (str_starts_with($q->sql, 'insert into "pak_conversion_runs"')) {
@@ -542,6 +780,7 @@ class ConversionInitialSaveTest extends TestCase
             $this->fail('Database fault swallowed');
         } catch (QueryException $e) {
             $this->assertSame($state, $e->errorInfo[0]);
+            $this->assertSame(1, $attempts);
             $this->assertSame(1, $hits);
             $this->assertEmptySave();
         }
