@@ -172,6 +172,76 @@
                 ])
             </div>
         </div>
+        <!-- Alert -->
+        <details class="group mt-4 rounded-xl border border-blue-200/90 shadow-md transition-all duration-200 overflow-hidden bg-white" role="region" aria-label="Keterangan Kode Formasi Jabatan">
+            <summary class="flex items-center justify-between py-2.5 px-3.5 sm:px-4 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden bg-white group-open:bg-blue-100/80 hover:bg-slate-50/80 group-open:hover:bg-blue-100/80 transition-colors">
+                <div class="flex items-center gap-2.5">
+                    <svg class="w-5 h-5 text-blue-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">
+                        Keterangan Kode Formasi Jabatan
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-blue-900 group-hover:text-blue-700 transition-colors">
+                    <span class="group-open:hidden">Lihat Keterangan</span>
+                    <span class="hidden group-open:inline">Sembunyikan</span>
+                    <svg class="w-4 h-4 transition-transform duration-200 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+            </summary>
+
+            <div class="border-t border-blue-200/90 bg-white divide-y divide-slate-100 text-xs sm:text-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-2.5 px-3.5 sm:px-4 hover:bg-slate-50/60 transition-colors">
+                    <div class="sm:w-64 md:w-72 flex-shrink-0 flex items-center gap-2.5">
+                        <span class="inline-flex items-center justify-center min-w-[34px] h-6 px-1.5 rounded-md font-mono font-bold text-xs bg-blue-100 text-blue-700 shadow-2xs select-none flex-shrink-0">
+                            *
+                        </span>
+                        <span class="font-bold text-slate-900 text-xs sm:text-sm">
+                            Nomenklatur Jabatan Lama
+                        </span>
+                    </div>
+                    <span class="hidden sm:inline text-slate-300 select-none">|</span>
+                    <p class="text-slate-600 sm:text-slate-700 leading-relaxed text-xs sm:text-sm flex-grow">
+                        Pegawai yang duduk dalam jabatan ini akan segera dipindahkan ke jabatan sesuai peraturan Jabatan Pelaksana terbaru atau PermenPANRB tentang jabatan fungsional terkait.
+                    </p>
+                </div>
+
+                <!-- Kode #5 -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-2.5 px-3.5 sm:px-4 hover:bg-slate-50/60 transition-colors">
+                    <div class="sm:w-64 md:w-72 flex-shrink-0 flex items-center gap-2.5">
+                        <span class="inline-flex items-center justify-center min-w-[34px] h-6 px-1.5 rounded-md font-mono font-bold text-xs bg-blue-100 text-blue-700 shadow-2xs select-none flex-shrink-0">
+                            #5
+                        </span>
+                        <span class="font-bold text-slate-900 text-xs sm:text-sm">
+                            Jabatan Fungsional Khusus
+                        </span>
+                    </div>
+                    <span class="hidden sm:inline text-slate-300 select-none">|</span>
+                    <p class="text-slate-600 sm:text-slate-700 leading-relaxed text-xs sm:text-sm flex-grow">
+                        Jabatan fungsional yang hanya dapat diduduki oleh mantan pejabat administrasi.
+                    </p>
+                </div>
+
+                <!-- Kode #20 -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-2.5 px-3.5 sm:px-4 hover:bg-slate-50/60 transition-colors">
+                    <div class="sm:w-64 md:w-72 flex-shrink-0 flex items-center gap-2.5">
+                        <span class="inline-flex items-center justify-center min-w-[34px] h-6 px-1.5 rounded-md font-mono font-bold text-xs bg-blue-100 text-blue-700 shadow-2xs select-none flex-shrink-0">
+                            #20
+                        </span>
+                        <span class="font-bold text-slate-900 text-xs sm:text-sm">
+                            Formasi PPPK
+                        </span>
+                    </div>
+                    <span class="hidden sm:inline text-slate-300 select-none">|</span>
+                    <p class="text-slate-600 sm:text-slate-700 leading-relaxed text-xs sm:text-sm flex-grow">
+                        Jabatan pelaksana yang berasal dari formasi PPPK.
+                    </p>
+                </div>
+            </div>
+        </details>
     </section>
 @endif
 </main>
