@@ -61,6 +61,7 @@
                     <th scope="col" class="px-4 py-3.5 text-center w-28 text-slate-800" title="Jumlah kebutuhan formasi berdasarkan Analisis Beban Kerja (ABK)">Kebutuhan</th>
                     <th scope="col" class="px-4 py-3.5 text-center w-28 text-amber-900" title="Formasi yang masih kosong/belum terisi Bezetting">Kosong</th>
                     <th scope="col" class="px-4 py-3.5 text-center w-44" title="Selisih = Bezetting dikurangi Kebutuhan. Minus (-) berarti kekurangan, Plus (+) berarti kelebihan">Selisih (Bezetting − Kebutuhan)</th>
+                    <th scope="col" class="px-4 py-3.5 text-center w-28" title="Informasi persyaratan jabatan yang harus dipenuhi">Persyaratan</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 bg-white">
@@ -135,19 +136,28 @@
                                 <span class="text-xs text-slate-400">-</span>
                             @elseif($selisih < 0)
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80 shadow-2xs" title="Kekurangan formasi: {{ abs($selisih) }}">
-                                    <span>{{ $selisih }}</span>
-                                    <span class="sr-only">(Kurang)</span>
+                                    <span>{{ abs($selisih) }}</span>
+                                    <span class=""> (Kurang) </span>
                                 </span>
                             @elseif($selisih > 0)
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs" title="Kelebihan formasi: +{{ $selisih }}">
-                                    <span>+{{ $selisih }}</span>
-                                    <span class="sr-only">(Lebih)</span>
+                                    <span>{{ $selisih }}</span>
+                                    <span class=""> (Lebih) </span>
                                 </span>
                             @else
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200/60" title="Formasi terpenuhi seimbang">
                                     0 (Penuh)
                                 </span>
                             @endif
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <a href="{link_google_drive}" target="_blank" rel="noopener noreferrer" 
+                            class="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-slate-200/60 rounded-lg hover:bg-blue-100 transition-colors duration-200 whitespace-nowrap">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                                Lihat Detail
+                            </a>
                         </td>
                     </tr>
                 @empty
