@@ -151,7 +151,7 @@
                             @endif
                         </td>
                         <td class="px-4 py-3 text-center">
-                            <a href="{link_google_drive}" target="_blank" rel="noopener noreferrer" 
+                            <a href="{{ route('position.requirements', ['jabatan' => $row['position_name']]) }}" target="_blank" rel="noopener noreferrer" 
                             class="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-slate-200/60 rounded-lg hover:bg-blue-100 transition-colors duration-200 whitespace-nowrap">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -203,6 +203,8 @@
                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-extrabold {{ $gap < 0 ? 'bg-rose-100 text-rose-800 border border-rose-300' : ($gap > 0 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-200 text-slate-800') }}">
                             {{ $gap > 0 ? '+'.$gap : $gap }}
                         </span>
+                    </td>
+                    <td class="px-4 py-3.5 text-center">
                     </td>
                 </tr>
             </tfoot>

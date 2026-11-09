@@ -8,7 +8,7 @@
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
 <a class="skip-link" href="#main">Lewati ke isi dashboard</a>
-@include('public-dashboard.header')
+@include('partials.header')
 @include('public-dashboard.hero')
 <main id="main" class="flex-grow">
 @if(!$data)
@@ -245,5 +245,5 @@
     </section>
 @endif
 </main>
-<footer class="border-t border-slate-200 bg-white"><div class="max-w-7xl mx-auto px-6 py-8 text-center text-xs text-slate-500"><strong class="text-slate-800">BBPMP Provinsi Jawa Timur</strong> &copy; {{ date('Y') }} &middot; Portal Data Kepegawaian</div></footer>
+@include('partials.footer')
 </body></html>
