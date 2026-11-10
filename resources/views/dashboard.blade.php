@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="id" class="scroll-smooth">
 <head>
+    @PwaHead
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Portal Data Kepegawaian BBPMP Jawa Timur</title>
     <meta name="description" content="Rekap publik pegawai, peta jabatan, dan proyeksi kebutuhan BBPMP Provinsi Jawa Timur.">
@@ -246,4 +247,6 @@
 @endif
 </main>
 @include('partials.footer')
-</body></html>
+@RegisterServiceWorkerScript
+</body>
+</html>

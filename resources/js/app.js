@@ -109,8 +109,10 @@ async function refreshDashboard(url) {
         if (activeFormationTab && activeFormationTab !== 'kepala-bbpmp') {
             switchFormationTab(activeFormationTab, replacement);
         }
-        const periodBadge = document.querySelector('[data-public-period]');
-        if (periodBadge) periodBadge.textContent = page.querySelector('[data-public-period]')?.textContent ?? '';
+        const newPeriodText = page.querySelector('[data-public-period]')?.textContent ?? '';
+        document.querySelectorAll('[data-public-period]').forEach(badge => {
+            badge.textContent = newPeriodText;
+        });
         history.replaceState(null, '', url);
         renderCharts();
         if (focusName) {

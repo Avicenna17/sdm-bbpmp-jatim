@@ -1,24 +1,35 @@
     <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 transition-all">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-20">
-                <div class="flex items-center gap-3.5">
-                    <div class="flex-shrink-0 w-13 h-13 rounded-xl  p-0.5 shadow-blue-900/10 flex items-center justify-center">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between min-h-[4.25rem] sm:min-h-0 sm:h-20 py-2 sm:py-0">
+                <div class="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+                    <div class="flex-shrink-0 w-11 h-11 sm:w-13 sm:h-13 rounded-xl p-0.5 shadow-blue-900/10 flex items-center justify-center">
                         <div class="w-full h-full bg-white rounded-[10px] flex items-center justify-center">
-                            <img src="{{ asset('images/bbpmp.png') }}" alt="Logo BBPMP Jatim" class="h-12 sm:h-14 w-auto object-contain" />
+                            <img src="{{ asset('logo.png') }}" alt="Logo BBPMP Jatim" class="h-10 sm:h-14 w-auto object-contain" />
                         </div>
                     </div>
-                    <div>
-                        <h1 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+                    <div class="min-w-0">
+                        <h1 class="text-xs sm:text-base md:text-lg font-bold text-slate-900 leading-tight">
                             PORTAL DATA KEPEGAWAIAN BBPMP
                         </h1>
-                        <p class="text-xs text-slate-500 font-medium hidden sm:block">
+                        <p class="text-xs text-slate-500 font-medium hidden md:block">
                             Sistem Informasi DUK & Peta Kebutuhan Jabatan (ABK)
                         </p>
+
+                        <!-- Mobile Live Data Badge (Tepat di bawah judul pada layar HP / < md) -->
+                        <div class="flex md:hidden items-center mt-1">
+                            <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-semibold shadow-2xs">
+                                <span class="relative flex h-1.5 w-1.5 flex-shrink-0">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                </span>
+                                <span data-public-period>Periode • {{ $period?->label ?? 'Belum dipublikasikan' }}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3 sm:gap-4">
-                    <!-- Data Badge -->
+                <div class="flex items-center gap-3 sm:gap-4 flex-shrink-0 ml-2 sm:ml-4">
+                    <!-- Data Badge-->
                     <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold shadow-2xs">
                         <span class="relative flex h-2 w-2">
                             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -26,16 +37,14 @@
                         </span>
                         <span data-public-period>Periode • {{ $period?->label ?? 'Belum dipublikasikan' }}</span>
                     </div>
-
                     <!-- Login Admin-->
-                    <a href="{{ route('filament.admin.auth.login') }}" class="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-900 to-indigo-900 hover:from-blue-800 hover:to-indigo-800 text-white text-xs sm:text-sm font-semibold shadow-md shadow-blue-950/15 hover:shadow-lg hover:shadow-blue-900/25 transition-all duration-200 transform hover:-translate-y-0.5">
-                        <svg class="w-4 h-4 text-amber-400 group-hover:rotate-12 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <a href="{{ route('filament.admin.auth.login') }}" class="group inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-blue-900 to-indigo-900 hover:from-blue-800 hover:to-indigo-800 text-white text-xs sm:text-sm font-semibold shadow-md shadow-blue-950/15 hover:shadow-lg hover:shadow-blue-900/25 transition-all duration-200 transform hover:-translate-y-0.5 flex-shrink-0">
+                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 group-hover:rotate-12 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                         </svg>
                         <span>Login Admin</span>
                     </a>
                 </div>
-
             </div>
         </div>
     </header>

@@ -1,0 +1,16 @@
+{
+    "name": "Dashboard SDM BBPMP Jati",
+    "short_name": "SDM BBPMP",
+    "background_color": "#ffffff",
+    "display": "standalone",
+    "description": "Monitoring DUK & Peta Jabatan BBPMP Jawa Timur",
+    "theme_color": "#1d4ed8",
+    "start_url": "/",
+    "icons": [
+        {
+            "src": "logo.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
