@@ -20,7 +20,7 @@
                 <div class="max-w-2xl space-y-4">
                     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-medium backdrop-blur-xs">
                         <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                        <span>Executive Dashboard • Balai Besar Penjaminan Mutu Pendidikan</span>
+                        <span>Executive Dashboard • Balai Besar Penjaminan Mutu Pendidikan Jawa Timur</span>
                     </div>
 
                     <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white leading-tight">
@@ -46,19 +46,19 @@
 
                 <!-- Hero Right: Quick Jump Nav -->
                 <div class="flex-shrink-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-2.5 sm:gap-3 bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
-                    <a href="#kpi-section" class="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-white/10 transition-colors text-xs font-semibold text-slate-200 hover:text-white">
+                    <a href="#kpi-section" class="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-white/10 transition-colors text-xs font-semibold text-slate-200 hover:text-white border border-white/10 px-3 py-1.5 rounded-lg">
                         <div class="w-7 h-7 rounded-lg bg-blue-600/30 flex items-center justify-center text-sky-400">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                         </div>
                         <span>Ringkasan Metrik Data</span>
                     </a>
-                    <a href="#grafik-section" class="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-white/10 transition-colors text-xs font-semibold text-slate-200 hover:text-white">
+                    <a href="#grafik-section" class="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-white/10 transition-colors text-xs font-semibold text-slate-200 hover:text-white border border-white/10 px-3 py-1.5 rounded-lg">
                         <div class="w-7 h-7 rounded-lg bg-indigo-600/30 flex items-center justify-center text-indigo-400">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/></svg>
                         </div>
                         <span>Visualisasi Grafik DUK</span>
                     </a>
-                    <a href="#duk-rekap-section" class="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-white/10 transition-colors text-xs font-semibold text-slate-200 hover:text-white col-span-2 sm:col-span-1">
+                    <a href="#duk-rekap-section" class="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-white/10 transition-colors text-xs font-semibold text-slate-200 hover:text-white col-span-2 sm:col-span-1 border border-white/10 px-3 py-1.5 rounded-lg">
                         <div class="w-7 h-7 rounded-lg bg-amber-600/30 flex items-center justify-center text-amber-400">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                         </div>

@@ -122,28 +122,28 @@
 
         <!-- Tble with Tab Switcher  -->
         <div data-formation-container class="space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-3 p-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
-                <div class="flex items-center gap-2.5 pl-3">
-                    <svg class="w-4 h-4 text-blue-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 sm:p-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
+                <div class="flex items-center gap-2.5 px-1 md:pl-3">
+                    <svg class="w-4 h-4 text-blue-900 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
                     </svg>
                     <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Pilih Tabel Formasi:</span>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 p-1 bg-slate-100/90 rounded-xl border border-slate-200/70" role="tablist">
+                <div class="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 p-1.5 sm:p-1 bg-slate-100/90 rounded-xl border border-slate-200/70" role="tablist">
                     <button type="button" 
                         role="tab" 
                         aria-selected="true" 
                         data-formation-tab="kepala-bbpmp" 
-                        class="tab-btn inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-900 shadow-2xs border border-slate-200/80 transition-all cursor-pointer">
-                        <span class="tab-dot w-2 h-2 rounded-full bg-blue-600 transition-colors"></span>
+                        class="tab-btn w-full sm:flex-1 md:flex-initial flex items-center justify-start sm:justify-center gap-2 px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-bold bg-white text-blue-900 shadow-2xs border border-slate-200/80 transition-all cursor-pointer">
+                        <span class="tab-dot w-2 h-2 rounded-full bg-blue-600 flex-shrink-0 transition-colors"></span>
                         <span>Dibawah Kepala BBPMP JATIM</span>
                     </button>
                     <button type="button" 
                         role="tab" 
                         aria-selected="false" 
                         data-formation-tab="kabag-umum" 
-                        class="tab-btn inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 border border-transparent transition-all cursor-pointer">
-                        <span class="tab-dot w-2 h-2 rounded-full bg-slate-400 transition-colors"></span>
+                        class="tab-btn w-full sm:flex-1 md:flex-initial flex items-center justify-start sm:justify-center gap-2 px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 border border-transparent transition-all cursor-pointer">
+                        <span class="tab-dot w-2 h-2 rounded-full bg-slate-400 flex-shrink-0 transition-colors"></span>
                         <span>Dibawah Kepala Bagian Umum</span>
                     </button>
                 </div>

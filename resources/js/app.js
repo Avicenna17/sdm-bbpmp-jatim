@@ -134,11 +134,11 @@ function switchFormationTab(targetId, container = document) {
         btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
         const dot = btn.querySelector('.tab-dot');
         if (isActive) {
-            btn.className = 'tab-btn inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-900 shadow-2xs border border-slate-200/80 transition-all cursor-pointer';
-            if (dot) dot.className = 'tab-dot w-2 h-2 rounded-full bg-blue-600 transition-colors';
+            btn.className = 'tab-btn w-full sm:flex-1 md:flex-initial flex items-center justify-start sm:justify-center gap-2 px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-bold bg-white text-blue-900 shadow-2xs border border-slate-200/80 transition-all cursor-pointer';
+            if (dot) dot.className = 'tab-dot w-2 h-2 rounded-full bg-blue-600 flex-shrink-0 transition-colors';
         } else {
-            btn.className = 'tab-btn inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 border border-transparent transition-all cursor-pointer';
-            if (dot) dot.className = 'tab-dot w-2 h-2 rounded-full bg-slate-400 transition-colors';
+            btn.className = 'tab-btn w-full sm:flex-1 md:flex-initial flex items-center justify-start sm:justify-center gap-2 px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 border border-transparent transition-all cursor-pointer';
+            if (dot) dot.className = 'tab-dot w-2 h-2 rounded-full bg-slate-400 flex-shrink-0 transition-colors';
         }
     });
 

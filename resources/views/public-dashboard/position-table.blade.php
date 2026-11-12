@@ -1,49 +1,57 @@
 <div id="{{ $id }}" class="portal-card !p-0 overflow-hidden border border-slate-200/90 shadow-sm hover:shadow-md transition-shadow duration-300 scroll-mt-24">
     <!-- Header Card -->
-    <div class="p-5 sm:p-6 bg-gradient-to-r from-slate-50 via-white to-blue-50/40 border-b border-slate-200/80">
+    <div class="p-4 sm:p-6 bg-gradient-to-r from-slate-50 via-white to-blue-50/40 border-b border-slate-200/80">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <!-- Title & Context -->
-            <div class="flex items-start gap-3.5">
-                <div class="flex-shrink-0 w-11 h-11 rounded-xl {{ $icon === 'bbpmp' ? 'bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-amber-400' : 'bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-sky-400' }} p-2.5 shadow-md flex items-center justify-center">
+            <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2.5 sm:gap-x-3.5 sm:gap-y-1 items-center sm:items-start">
+                <div class="col-start-1 row-start-1 sm:row-span-3 flex-shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-xl {{ $icon === 'bbpmp' ? 'bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-amber-400' : 'bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-sky-400' }} p-2 sm:p-2.5 shadow-md flex items-center justify-center">
                     @if($icon === 'bbpmp')
-                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2L1 7l11 5 9-4.09V17h2V7L12 2z"/>
                             <path d="M4.5 10.5v5.88c0 3.12 3.36 5.62 7.5 5.62s7.5-2.5 7.5-5.62v-5.88l-7.5 3.41-7.5-3.41z" opacity="0.85"/>
                         </svg>
                     @else
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                         </svg>
                     @endif
                 </div>
-                <div>
-                    <div class="flex flex-wrap items-center gap-2 mb-1">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold {{ $badgeColor === 'blue' ? 'bg-blue-100/80 text-blue-900 border border-blue-200' : 'bg-indigo-100/80 text-indigo-900 border border-indigo-200' }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $badgeColor === 'blue' ? 'bg-blue-600' : 'bg-indigo-600' }}"></span>
-                            {{ $unitBadge }}
-                        </span>
-                        <span class="text-xs text-slate-400">&bull;</span>
-                        <span class="text-xs text-slate-500 font-medium">Rekapitulasi Formasi ABK & DUK</span>
-                    </div>
-                    <h3 class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
-                        {{ $title }}
-                    </h3>
-                    <p class="text-xs sm:text-sm text-slate-500 mt-1">
-                        Daftar lengkap formasi jabatan, beban bezetting saat ini, proyeksi kebutuhan, dan selisih formasi.
-                    </p>
+
+                <!-- Badge + Label Rekapitulasi -->
+                <div class="col-start-2 row-start-1 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-1 sm:gap-2 min-w-0">
+                    <span class="self-start inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-semibold {{ $badgeColor === 'blue' ? 'bg-blue-100/80 text-blue-900 border border-blue-200' : 'bg-indigo-100/80 text-indigo-900 border border-indigo-200' }}">
+                        <span class="w-1.5 h-1.5 rounded-full {{ $badgeColor === 'blue' ? 'bg-blue-600' : 'bg-indigo-600' }}"></span>
+                        {{ $unitBadge }}
+                    </span>
+                    <span class="hidden sm:inline text-xs text-slate-400">&bull;</span>
+                    <span class="text-[11px] sm:text-xs text-slate-500 font-medium leading-tight">Rekapitulasi Formasi ABK & DUK</span>
                 </div>
+
+                <!-- Judul Utama Tabel -->
+                <h3 class="col-span-2 sm:col-span-1 sm:col-start-2 sm:row-start-2 text-base sm:text-xl font-extrabold text-slate-900 tracking-tight leading-snug">
+                    {{ $title }}
+                </h3>
+
+                <!-- Deskripsi -->
+                <p class="col-span-2 sm:col-span-1 sm:col-start-2 sm:row-start-3 text-xs sm:text-sm text-slate-500 leading-relaxed -mt-1 sm:mt-0">
+                    Daftar lengkap formasi jabatan, beban bezetting saat ini, proyeksi kebutuhan, dan selisih formasi.
+                </p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-2 self-start lg:self-center">
-                <div class="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 shadow-2xs flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-                    <span><strong>{{ count($peta['top']) }}</strong> Formasi</span>
+            <!-- Ringkasan Formasi, Bezetting, Kebutuhan -->
+            <div class="grid grid-cols-3 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto self-start lg:self-center flex-shrink-0">
+                <div class="px-2 py-2 sm:px-3 sm:py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 shadow-2xs flex flex-col sm:flex-row items-center justify-center sm:gap-1.5 text-center">
+                    <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                    <strong class="text-sm sm:text-xs font-extrabold sm:font-bold text-slate-900 sm:text-slate-700 leading-tight">{{ count($peta['top']) }}</strong>
+                    <span class="text-[11px] sm:text-xs font-medium sm:font-semibold text-slate-500 sm:text-slate-700 leading-tight mt-0.5 sm:mt-0">Formasi</span>
                 </div>
-                <div class="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-xs font-bold text-blue-900 shadow-2xs flex items-center gap-1.5">
-                    <span><strong>{{ number_format($peta['incumbents'], 0, ',', '.') }}</strong> Bezetting</span>
+                <div class="px-2 py-2 sm:px-3 sm:py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 shadow-2xs flex flex-col sm:flex-row items-center justify-center sm:gap-1.5 text-center">
+                    <strong class="text-sm sm:text-xs font-extrabold sm:font-bold leading-tight">{{ number_format($peta['incumbents'], 0, ',', '.') }}</strong>
+                    <span class="text-[11px] sm:text-xs font-semibold sm:font-bold text-blue-700 sm:text-blue-900 leading-tight mt-0.5 sm:mt-0">Bezetting</span>
                 </div>
-                <div class="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-xs font-bold text-amber-900 shadow-2xs flex items-center gap-1.5">
-                    <span><strong>{{ number_format($peta['requirements'], 0, ',', '.') }}</strong> Kebutuhan</span>
+                <div class="px-2 py-2 sm:px-3 sm:py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 shadow-2xs flex flex-col sm:flex-row items-center justify-center sm:gap-1.5 text-center">
+                    <strong class="text-sm sm:text-xs font-extrabold sm:font-bold leading-tight">{{ number_format($peta['requirements'], 0, ',', '.') }}</strong>
+                    <span class="text-[11px] sm:text-xs font-semibold sm:font-bold text-amber-700 sm:text-amber-900 leading-tight mt-0.5 sm:mt-0">Kebutuhan</span>
                 </div>
             </div>
         </div>
