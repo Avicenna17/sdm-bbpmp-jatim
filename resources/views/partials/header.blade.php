@@ -10,7 +10,7 @@
                     </div>
                     <div class="min-w-0">
                         <h1 class="text-[11px] min-[360px]:text-xs sm:text-base lg:text-lg font-bold text-slate-900 leading-tight tracking-tight">
-                            PORTAL DATA KEPEGAWAIAN BBPMP
+                            PORTAL DATA KEPEGAWAIAN BBPMP JATIM
                         </h1>
                         <p class="text-xs text-slate-500 font-medium hidden md:block truncate">
                             Sistem Informasi DUK & Peta Kebutuhan Jabatan (ABK)

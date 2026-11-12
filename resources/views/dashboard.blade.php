@@ -23,14 +23,21 @@
     @endphp
     <section id="kpi-section" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-20">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            @foreach([
-                ['Total '.$filters['employment_group'],number_format($data['total'],0,',','.'),'Pegawai sesuai filter'],
-                ['Kebutuhan (ABK)',number_format($peta['requirements'],0,',','.'),'Formasi sesuai filter jabatan'],
-                ['Rasio keterisian',$ratio === null ? '-' : number_format($ratio,1,',','.').'%', 'Bezetting / kebutuhan formasi'],
-                ['Selisih formasi',($gap>0?'+':'').number_format($gap,0,',','.'),'Bezetting dikurangi kebutuhan'],
-                ['Pensiun 5 tahun',number_format($peta['retirement_total'],0,',','.'),'Total sesuai kolom sumber'],
-            ] as [$label,$value,$caption])
-            <article class="portal-card"><span class="text-xs font-semibold uppercase tracking-wider text-slate-500">{{ $label }}</span><div class="text-3xl font-extrabold {{ $label === 'Selisih formasi' && $gap < 0 ? 'text-red-600' : 'text-blue-950' }} mt-4">{{ $value }}</div><p class="text-xs text-slate-500 mt-3">{{ $caption }}</p></article>
+        @foreach([
+                ['Total '.$filters['employment_group'], number_format($data['total'],0,',','.'), 'Pegawai sesuai filter', 'text-emerald-600 bg-emerald-100', '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>'],
+                ['Kebutuhan (ABK)', number_format($peta['requirements'],0,',','.'), 'Formasi sesuai filter jabatan', 'text-blue-600 bg-blue-100', '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>'],
+                ['Rasio keterisian', $ratio === null ? '-' : number_format($ratio,1,',','.').'%', 'Bezetting / kebutuhan formasi', 'text-amber-600 bg-amber-100', '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>'],
+                ['Selisih formasi', ($gap>0?'+':'').number_format($gap,0,',','.'), 'Bezetting dikurangi kebutuhan', 'text-red-600 bg-red-100', '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>'],
+                ['Pensiun 5 tahun', number_format($peta['retirement_total'],0,',','.'), 'Total sesuai kolom sumber', 'text-purple-600 bg-purple-100', '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>'],
+            ] as [$label, $value, $caption, $theme, $icon])
+            <article class="portal-card relative shadow-lg hover:shadow-xl hover:shadow-blue-600/20 hover:border-blue-700 hover:-translate-y-0.5 transition-all duration-200">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">{{ $label }}</span>
+                    <div class="flex h-10 w-10 items-center justify-center rounded-lg {{ $theme }}">{!! $icon !!}</div>
+                </div>
+                <div class="text-3xl font-extrabold {{ $label === 'Selisih formasi' && $gap < 0 ? 'text-red-600' : 'text-blue-950' }} mt-2">{{ $value }}</div>
+                <p class="text-xs text-slate-500 mt-3">{{ $caption }}</p>
+            </article>
             @endforeach
         </div>
         <p class="text-xs text-slate-500 mt-4">{{ ($period?->label ?? 'DUK belum dipublikasikan') }} · Diperbarui {{ $period?->published_at?->timezone('Asia/Jakarta')->format('d/m/Y H:i') }} WIB.</p>

@@ -19,7 +19,7 @@ return [
     */
 
     'manifest' => [
-        'name' => 'Dashboard SDM BBPMP Jati',
+        'name' => 'Dashboard SDM BBPMP Jatim',
         'short_name' => 'SDM BBPMP',
         'background_color' => '#ffffff',
         'display' => 'standalone',
