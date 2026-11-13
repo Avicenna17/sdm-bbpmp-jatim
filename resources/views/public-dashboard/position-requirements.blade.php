@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="id" class="scroll-smooth">
 <head>
+    @PwaHead
+    @include('partials.pwa-ios-splash')
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Persyaratan Jabatan Fungsional - {{ $positionName }} | Portal Data Kepegawaian BBPMP</title>
@@ -198,6 +200,7 @@
     </div>
 </main>
 @include('partials.footer')
+@RegisterServiceWorkerScript
 </body>
 </html>
 

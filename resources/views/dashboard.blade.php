@@ -2,6 +2,7 @@
 <html lang="id" class="scroll-smooth">
 <head>
     @PwaHead
+    @include('partials.pwa-ios-splash')
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Portal Data Kepegawaian BBPMP Jawa Timur</title>
     <meta name="description" content="Rekap publik pegawai, peta jabatan, dan proyeksi kebutuhan BBPMP Provinsi Jawa Timur.">

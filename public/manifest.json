@@ -1,16 +1,35 @@
 {
-    "name": "Dashboard SDM BBPMP Jati",
-    "short_name": "SDM BBPMP",
-    "background_color": "#ffffff",
-    "display": "standalone",
-    "description": "Monitoring DUK & Peta Jabatan BBPMP Jawa Timur",
-    "theme_color": "#1d4ed8",
-    "start_url": "/",
-    "icons": [
-        {
-            "src": "logo.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        }
-    ]
+  "name": "Dashboard SDM BBPMP Jatim",
+  "short_name": "SDM BBPMP",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "description": "Monitoring DUK & Peta Jabatan BBPMP Jawa Timur",
+  "theme_color": "#1d4ed8",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/splash-screens/manifest-icon-192.maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/splash-screens/manifest-icon-192.maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/splash-screens/manifest-icon-512.maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/splash-screens/manifest-icon-512.maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
 }
