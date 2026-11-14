@@ -79,7 +79,7 @@ $result = ['success' => false, 'issue_code' => null, 'batch_id' => $input['batch
     'status' => null, 'evaluation_id' => null, 'connection_id' => $connectionId, 'pid' => getmypid()];
 try {
     $actor = User::findOrFail($input['actor']);
-    if (in_array($input['operation'], ['conversion', 'correct'], true)) {
+    if (in_array($input['operation'], ['conversion', 'correct', 'history'], true)) {
         $result['attempts'] = 0;
         DB::connection()->beforeStartingTransaction(function () use (&$result) {
             $result['attempts']++;
@@ -95,7 +95,7 @@ try {
             'summary' => $batch->summary, 'rows' => $batch->rows()->orderBy('record_ordinal')->get()->map(fn ($row) => ['id' => $row->id, 'status' => $row->processing_status->value, 'evaluation_id' => $row->performance_evaluation_id])->all()];
         $result['status'] = $batch->status->value;
     } elseif ($input['operation'] === 'history') {
-        $history = app(EmployeeHistoryService::class)->record($actor, Person::findOrFail($input['person']), $input['history'], true);
+        $history = app(EmployeeHistoryService::class)->record($actor, Person::findOrFail($input['person']), $input['history'], true, $input['supersedes_id'] ?? null, $input['reason'] ?? null);
         $result['history_id'] = $history->id;
     } elseif ($input['operation'] === 'duk') {
         app(ImportService::class)->commit($actor, ImportBatch::findOrFail($input['batch_id']));
@@ -126,7 +126,7 @@ try {
         : ($error instanceof ValidationException ? (array_values($error->errors())[0][0] ?? 'VALIDATION_FAILED')
             : ($error->issue_code ?? 'UNEXPECTED_FAILURE'));
 }
-if (in_array($input['operation'], ['conversion', 'correct'], true)) {
+if (in_array($input['operation'], ['conversion', 'correct', 'history'], true)) {
     $result['transaction_level'] = DB::transactionLevel();
     $result['pdo_active'] = DB::connection()->getPdo()->inTransaction();
 }
