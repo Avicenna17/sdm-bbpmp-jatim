@@ -79,7 +79,7 @@ $result = ['success' => false, 'issue_code' => null, 'batch_id' => $input['batch
     'status' => null, 'evaluation_id' => null, 'connection_id' => $connectionId, 'pid' => getmypid()];
 try {
     $actor = User::findOrFail($input['actor']);
-    if (in_array($input['operation'], ['conversion', 'correct', 'history', 'master'], true)) {
+    if (in_array($input['operation'], ['conversion', 'correct', 'history', 'master', 'duk'], true)) {
         $result['attempts'] = 0;
         DB::connection()->beforeStartingTransaction(function () use (&$result) {
             $result['attempts']++;
@@ -126,7 +126,7 @@ try {
         : ($error instanceof ValidationException ? (array_values($error->errors())[0][0] ?? 'VALIDATION_FAILED')
             : ($error->issue_code ?? 'UNEXPECTED_FAILURE'));
 }
-if (in_array($input['operation'], ['conversion', 'correct', 'history', 'master'], true)) {
+if (in_array($input['operation'], ['conversion', 'correct', 'history', 'master', 'duk'], true)) {
     $result['transaction_level'] = DB::transactionLevel();
     $result['pdo_active'] = DB::connection()->getPdo()->inTransaction();
 }
