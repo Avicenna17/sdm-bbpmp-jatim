@@ -79,11 +79,13 @@ $result = ['success' => false, 'issue_code' => null, 'batch_id' => $input['batch
     'status' => null, 'evaluation_id' => null, 'connection_id' => $connectionId, 'pid' => getmypid()];
 try {
     $actor = User::findOrFail($input['actor']);
-    if ($input['operation'] === 'conversion') {
+    if (in_array($input['operation'], ['conversion', 'correct'], true)) {
         $result['attempts'] = 0;
         DB::connection()->beforeStartingTransaction(function () use (&$result) {
             $result['attempts']++;
         });
+    }
+    if ($input['operation'] === 'conversion') {
         $run = app(ConversionService::class)->saveInitial($actor, ConversionSaveRequest::from($input['request']));
         $result['run_id'] = $run->id;
         $result['status'] = $run->status->value;
@@ -118,12 +120,13 @@ try {
     }
     $result['success'] = true;
 } catch (Throwable $error) {
+    $result['validation_fields'] = $error instanceof ValidationException ? array_keys($error->errors()) : [];
     $result['issue_code'] = $input['operation'] === 'conversion'
         ? ($error instanceof ValidationException ? 'VALIDATION_FAILED' : 'UNEXPECTED_FAILURE')
         : ($error instanceof ValidationException ? (array_values($error->errors())[0][0] ?? 'VALIDATION_FAILED')
             : ($error->issue_code ?? 'UNEXPECTED_FAILURE'));
 }
-if ($input['operation'] === 'conversion') {
+if (in_array($input['operation'], ['conversion', 'correct'], true)) {
     $result['transaction_level'] = DB::transactionLevel();
     $result['pdo_active'] = DB::connection()->getPdo()->inTransaction();
 }
