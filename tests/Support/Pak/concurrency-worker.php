@@ -2,6 +2,7 @@
 
 // Test-only process entrypoint. Credentials arrive on stdin and are never returned.
 use App\Domain\Import\ImportService;
+use App\Domain\Pak\DTOs\ConversionReplaceRequest;
 use App\Domain\Pak\DTOs\ConversionSaveRequest;
 use App\Domain\Pak\Services\ConversionService;
 use App\Domain\Pak\Services\EmployeeHistoryService;
@@ -34,7 +35,7 @@ config(['database.default' => 'mysql', 'database.connections.mysql' => $input['d
     'filesystems.disks.local' => ['driver' => 'local', 'root' => $input['root'], 'visibility' => 'private', 'throw' => false]]);
 Connection::resolverFor('mysql', fn ($pdo, $database, $prefix, $config) => new ConcurrencyConnection($pdo, $database, $prefix, $config));
 DB::purge('mysql');
-if ($input['operation'] === 'conversion') {
+if (in_array($input['operation'], ['conversion', 'conversion_replace'], true)) {
     if (getenv('PAK_CONCURRENCY') !== '1' || getenv('PAK_DISPOSABLE_DB') !== 'pak_02a1_test'
         || (int) $input['db']['port'] !== 33318
         || DB::selectOne('SELECT DATABASE() AS db')->db !== 'pak_02a1_test'
@@ -79,7 +80,7 @@ $result = ['success' => false, 'issue_code' => null, 'batch_id' => $input['batch
     'status' => null, 'evaluation_id' => null, 'connection_id' => $connectionId, 'pid' => getmypid()];
 try {
     $actor = User::findOrFail($input['actor']);
-    if (in_array($input['operation'], ['conversion', 'correct', 'history', 'master', 'duk'], true)) {
+    if (in_array($input['operation'], ['conversion', 'conversion_replace', 'correct', 'history', 'master', 'duk'], true)) {
         $result['attempts'] = 0;
         DB::connection()->beforeStartingTransaction(function () use (&$result) {
             $result['attempts']++;
@@ -87,6 +88,10 @@ try {
     }
     if ($input['operation'] === 'conversion') {
         $run = app(ConversionService::class)->saveInitial($actor, ConversionSaveRequest::from($input['request']));
+        $result['run_id'] = $run->id;
+        $result['status'] = $run->status->value;
+    } elseif ($input['operation'] === 'conversion_replace') {
+        $run = app(ConversionService::class)->replace($actor, ConversionReplaceRequest::from($input['request']));
         $result['run_id'] = $run->id;
         $result['status'] = $run->status->value;
     } elseif ($input['operation'] === 'commit') {
@@ -120,15 +125,22 @@ try {
     }
     $result['success'] = true;
 } catch (Throwable $error) {
+    if ($input['operation'] === 'conversion_replace') {
+        $result['failure_class'] = $error::class;
+    }
     $result['validation_fields'] = $error instanceof ValidationException ? array_keys($error->errors()) : [];
-    $result['issue_code'] = $input['operation'] === 'conversion'
+    $result['issue_code'] = in_array($input['operation'], ['conversion', 'conversion_replace'], true)
         ? ($error instanceof ValidationException ? 'VALIDATION_FAILED' : 'UNEXPECTED_FAILURE')
         : ($error instanceof ValidationException ? (array_values($error->errors())[0][0] ?? 'VALIDATION_FAILED')
             : ($error->issue_code ?? 'UNEXPECTED_FAILURE'));
 }
-if (in_array($input['operation'], ['conversion', 'correct', 'history', 'master', 'duk'], true)) {
+if (in_array($input['operation'], ['conversion', 'conversion_replace', 'correct', 'history', 'master', 'duk'], true)) {
     $result['transaction_level'] = DB::transactionLevel();
     $result['pdo_active'] = DB::connection()->getPdo()->inTransaction();
+}
+if ($input['operation'] === 'conversion_replace') {
+    $result['pending_callbacks'] = app('db.transactions')->getPendingTransactions()->count();
+    $result['committed_callbacks'] = app('db.transactions')->getCommittedTransactions()->count();
 }
 $result['diagnostics'] = ConcurrencyConnection::$diagnostics;
 echo json_encode($result, JSON_THROW_ON_ERROR).PHP_EOL;
