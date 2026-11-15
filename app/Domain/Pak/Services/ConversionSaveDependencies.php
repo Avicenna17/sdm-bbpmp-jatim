@@ -2,15 +2,18 @@
 
 namespace App\Domain\Pak\Services;
 
+use App\Domain\Pak\DTOs\ConversionReplaceRequest;
 use App\Models\AkCoefficientRule;
 use App\Models\EmployeePositionHistory;
 use App\Models\FunctionalLevel;
 use App\Models\FunctionalPosition;
 use App\Models\FunctionalPositionLevel;
 use App\Models\PakCase;
+use App\Models\PakConversionRun;
 use App\Models\PakRuleSet;
 use App\Models\PerformanceEvaluation;
 use App\Models\PerformancePredicateRule;
+use App\Models\User;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +28,8 @@ final class ConversionSaveDependencies extends ConversionPreviewDependencies
     private array $evaluationIds;
 
     private array $historyIds;
+
+    private ?PakConversionRun $replacementTarget = null;
 
     private function __construct(private PakCase $lockedCase, private PakRuleSet $lockedRule) {}
 
@@ -50,6 +55,28 @@ final class ConversionSaveDependencies extends ConversionPreviewDependencies
     /** Case, Person and RuleSet are already coordinated by the owning service. */
     public static function coordinate(PakCase $case, PakRuleSet $rule, array $plan): self
     {
+        return self::coordinateResources($case, $rule, $plan, function (self $reader) use ($case): void {
+            if ($case->conversionRuns()->sharedLock()->first() !== null) {
+                throw ValidationException::withMessages(['case' => 'Initial save requires a case with no conversion-run history.']);
+            }
+        });
+    }
+
+    public static function coordinateReplacement(PakCase $case, PakRuleSet $rule, array $plan, User $actor, ConversionReplaceRequest $request): self
+    {
+        return self::coordinateResources($case, $rule, $plan, function (self $reader) use ($case, $actor, $request): void {
+            $reader->replacementTarget = app(ConversionRunLifecycle::class)->lockTarget($actor, $case, $request);
+        });
+    }
+
+    public function replacementTarget(): PakConversionRun
+    {
+        return $this->replacementTarget ?? throw new LogicException('Replacement target has not been coordinated.');
+    }
+
+    /** Only explicit lifecycle entry points can supply the run-resource guard. */
+    private static function coordinateResources(PakCase $case, PakRuleSet $rule, array $plan, Closure $coordinateRun): self
+    {
         if (DB::transactionLevel() !== 1) {
             throw new LogicException('Conversion save dependencies require the owned transaction.');
         }
@@ -61,9 +88,7 @@ final class ConversionSaveDependencies extends ConversionPreviewDependencies
         PerformancePredicateRule::where('pak_rule_set_id', $rule->id)->orderBy('id')->sharedLock()->get();
         AkCoefficientRule::where('pak_rule_set_id', $rule->id)->orderBy('id')->sharedLock()->get();
         $reader->masters = app(SharedMasterLocks::class)->acquire(mappingIds: $plan['mappings'], positionIds: $plan['positions'], levelIds: $plan['levels']);
-        if ($case->conversionRuns()->sharedLock()->first() !== null) {
-            throw ValidationException::withMessages(['case' => 'Initial save requires a case with no conversion-run history.']);
-        }
+        $coordinateRun($reader);
         // Person coordination prevents compliant writers from adding/changing dependencies.
         // Individual PK locks make acquisition order independent of the query optimizer.
         $reader->evaluationIds = PerformanceEvaluation::where('person_id', $case->person_id)->orderBy('id')->pluck('id')->all();
