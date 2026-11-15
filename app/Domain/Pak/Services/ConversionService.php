@@ -135,8 +135,25 @@ final class ConversionService
         }
     }
 
-    /** Single owned attempt. Replacement retry is deliberately outside this slice. */
     public function replace(User $actor, ConversionReplaceRequest $request): PakConversionRun
+    {
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $rolledBack = false;
+            try {
+                return $this->replaceAttempt($actor, $request, $rolledBack);
+            } catch (Throwable $error) {
+                if (! $rolledBack || ! MySqlDeadlock::allows($error)) {
+                    throw $error;
+                }
+                if ($attempt === 3) {
+                    throw ValidationException::withMessages(['conversion' => 'CONCURRENCY_RETRY_EXHAUSTED']);
+                }
+            }
+        }
+    }
+
+    /** Only cleanup proof escapes; all authoritative state belongs to this fresh attempt. */
+    private function replaceAttempt(User $actor, ConversionReplaceRequest $request, bool &$rolledBack): PakConversionRun
     {
         $connection = DB::connection();
         $this->requireTopLevel($connection);
@@ -153,6 +170,7 @@ final class ConversionService
             throw new LogicException('Conversion replacement requires an inactive PDO transaction.');
         }
 
+        $commitStarted = false;
         try {
             $connection->beginTransaction();
             $case = PakCase::lockForUpdate()->findOrFail($request->pak_case_id);
@@ -195,19 +213,23 @@ final class ConversionService
                     'status' => $status->value, 'issue_codes' => array_values(array_unique(array_column($result->issues, 'issue_code')))],
                 'reason' => $request->revision_reason, 'supersedes_id' => $predecessor->id,
             ], $case->id);
+            $commitStarted = true;
             $connection->commit();
 
             return $run;
         } catch (Throwable $error) {
-            // Public Laravel rollback retains manager/callback bookkeeping. Never retry,
-            // including when commit succeeded before a callback/commit event threw.
+            // Preserve Laravel bookkeeping; an inactive PDO once commit started is uncertain.
+            // Cleanup alone is not proof that the database did not commit.
             try {
-                if ($connection->transactionLevel() > 0) {
+                $level = $connection->transactionLevel();
+                $active = $pdo->inTransaction();
+                if ($level > 0) {
                     $connection->rollBack(0);
                 }
                 if ($connection->transactionLevel() !== 0 || $pdo->inTransaction()) {
                     throw new LogicException('Conversion replacement transaction cleanup failed.');
                 }
+                $rolledBack = $level > 0 && (! $commitStarted || $active);
             } catch (Throwable $cleanupError) {
                 throw new LogicException('Conversion replacement transaction cleanup failed.', 0, $cleanupError);
             }

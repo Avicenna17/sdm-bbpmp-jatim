@@ -26,6 +26,7 @@ use App\Models\Person;
 use App\Models\User;
 use Illuminate\Database\Events\TransactionCommitted;
 use Illuminate\Database\Events\TransactionCommitting;
+use Illuminate\Database\Events\TransactionRolledBack;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Grammars\SQLiteGrammar;
 use Illuminate\Database\QueryException;
@@ -449,7 +450,7 @@ class ConversionReplacementSaveTest extends TestCase
     }
 
     #[DataProvider('commitFailures')]
-    public function test_deadlock_shaped_commit_failure_never_retries(string $stage): void
+    public function test_commit_failure_retries_only_when_proven_uncommitted(string $stage): void
     {
         $this->renameLevel('Commit fixture');
         $request = $this->replacementRequest();
@@ -481,12 +482,16 @@ class ConversionReplacementSaveTest extends TestCase
         try {
             app(ConversionService::class)->replace($this->actor, $request);
             $this->fail('Commit fault swallowed.');
+        } catch (ValidationException $error) {
+            $this->assertSame('before_commit', $stage);
+            $this->assertSame(['conversion' => ['CONCURRENCY_RETRY_EXHAUSTED']], $error->errors());
         } catch (QueryException $error) {
+            $this->assertNotSame('before_commit', $stage);
             $this->assertSame($fault, $error);
         } finally {
             $dispatcher->forget($event);
         }
-        $this->assertSame(1, $attempts);
+        $this->assertSame($stage === 'before_commit' ? 3 : 1, $attempts);
         $this->assertSame($stage === 'after_commit' ? 1 : 0, $callbacks);
         if ($stage === 'before_commit') {
             $this->assertUnchanged($before);
@@ -496,6 +501,188 @@ class ConversionReplacementSaveTest extends TestCase
             $this->assertSame($request->expected_case_lock_version + 1, $this->case->fresh()->lock_version);
             $this->assertClean();
         }
+    }
+
+    private function databaseFault(string $state = '40001', int $vendor = 1213): QueryException
+    {
+        $previous = new \PDOException('Synthetic database fault');
+        $previous->errorInfo = [$state, $vendor, 'Synthetic'];
+
+        return new QueryException('sqlite', 'synthetic', [], $previous);
+    }
+
+    public static function retryWrites(): array
+    {
+        return [['supersession', 1], ['audit', 1], ['audit', 2], ['audit', 3]];
+    }
+
+    #[DataProvider('retryWrites')]
+    public function test_deadlocks_rollback_all_state_before_fresh_retry(string $boundary, int $failures): void
+    {
+        $this->renameLevel('Retry fixture');
+        $request = $this->replacementRequest();
+        $before = $this->state();
+        $attempts = $discoveries = $hits = $callbacks = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts, $before) {
+            $this->assertUnchanged($before);
+            $attempts++;
+        });
+        PakConversionRun::updating(function () {
+            $this->fail('Generic run update must not be used.');
+        });
+        DB::listen(function ($q) use (&$discoveries, &$hits, &$callbacks, $failures, $boundary) {
+            if (str_starts_with($q->sql, 'select "person_id" from "pak_cases"')) {
+                $discoveries++;
+            }
+            $prefix = $boundary === 'audit' ? 'insert into "pak_events"' : 'update "pak_conversion_runs"';
+            if (str_starts_with($q->sql, $prefix)) {
+                $hits++;
+                DB::afterCommit(function () use (&$callbacks) {
+                    $callbacks++;
+                });
+                $this->assertSame('SUPERSEDED', $this->predecessor->fresh()->status->value);
+                if ($boundary === 'audit') {
+                    $this->assertSame(2, PakConversionRun::count());
+                    $this->assertSame(8, PakConversionPeriod::count());
+                    $this->assertSame(1, PakEvent::where('event_code', 'CONVERSION_RUN_REPLACED')->count());
+                }
+                if ($hits <= $failures) {
+                    throw $this->databaseFault();
+                }
+            }
+        });
+        try {
+            $new = app(ConversionService::class)->replace($this->actor, $request);
+            $this->assertLessThan(3, $failures);
+            $this->assertSame(2, $new->revision_number);
+            $this->assertSame(2, PakConversionRun::count());
+            $this->assertSame(8, PakConversionPeriod::count());
+            $this->assertSame(1, PakConversionRun::whereNotNull('active_case_id')->count());
+            $this->assertSame($request->expected_case_lock_version + 1, $this->case->fresh()->lock_version);
+            $this->assertSame(1, PakEvent::where('event_code', 'CONVERSION_RUN_REPLACED')->count());
+            $this->assertSame(1, $callbacks);
+        } catch (ValidationException $error) {
+            $this->assertSame(3, $failures);
+            $this->assertSame(['conversion' => ['CONCURRENCY_RETRY_EXHAUSTED']], $error->errors());
+            $this->assertSame(0, $callbacks);
+            $this->assertUnchanged($before);
+        }
+        $this->assertSame(min(3, $failures + 1), $attempts);
+        $this->assertSame($attempts, $discoveries);
+        $this->assertSame($attempts, $hits);
+        $this->assertClean();
+    }
+
+    public function test_fresh_retry_rebuilds_changed_dependency_and_stops_on_stale_snapshot(): void
+    {
+        $this->renameLevel('State A');
+        $request = $this->replacementRequest();
+        $before = $this->state();
+        $attempts = $discoveries = $faults = 0;
+        $mutating = false;
+        $grammar = $this->observeLockReads();
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts, &$mutating) {
+            $this->assertClean();
+            if (! $mutating) {
+                $attempts++;
+            }
+        });
+        DB::listen(function ($q) use (&$discoveries, &$faults) {
+            if (str_starts_with($q->sql, 'select "person_id" from "pak_cases"')) {
+                $discoveries++;
+            }
+            if ($faults === 0 && str_starts_with($q->sql, 'insert into "pak_events"')) {
+                $faults++;
+                throw $this->databaseFault();
+            }
+        });
+        $dispatcher = DB::connection()->getEventDispatcher();
+        $dispatcher->listen(TransactionRolledBack::class, function () use (&$mutating, &$before, &$attempts) {
+            $this->assertClean();
+            if ($attempts === 1) {
+                $this->assertUnchanged($before);
+                $mutating = true;
+                $this->renameLevel('State B committed between attempts');
+                $mutating = false;
+                $before = $this->state();
+            }
+        });
+        try {
+            app(ConversionService::class)->replace($this->actor, $request);
+            $this->fail('Stale retry accepted.');
+        } catch (ValidationException $error) {
+            $this->assertSame(['snapshot'], array_keys($error->errors()));
+        } finally {
+            $dispatcher->forget(TransactionRolledBack::class);
+        }
+        $this->assertSame(2, $attempts);
+        $this->assertSame(2, $discoveries);
+        $this->assertSame(2, count(array_filter($grammar->reads, fn ($r) => $r['table'] === 'pak_conversion_runs')));
+        $this->assertUnchanged($before);
+        $fresh = $this->preview();
+        $this->assertNotSame($request->expected_dependency_fingerprint, $fresh->dependency_fingerprint);
+        $this->assertNotSame($request->expected_snapshot_fingerprint, $fresh->snapshot_fingerprint);
+    }
+
+    public static function nonRetryFaults(): array
+    {
+        return [['40001', 1062], ['HY000', 1213], ['HY000', 1205], ['runtime', 0]];
+    }
+
+    #[DataProvider('nonRetryFaults')]
+    public function test_nonapproved_write_failure_does_not_retry(string $state, int $vendor): void
+    {
+        $this->renameLevel('Nonretry fixture');
+        $request = $this->replacementRequest();
+        $before = $this->state();
+        $fault = $state === 'runtime' ? new \RuntimeException('Synthetic application failure') : $this->databaseFault($state, $vendor);
+        $attempts = $discoveries = 0;
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts) {
+            $attempts++;
+        });
+        DB::listen(function ($q) use (&$discoveries, $fault) {
+            if (str_starts_with($q->sql, 'select "person_id" from "pak_cases"')) {
+                $discoveries++;
+            }
+            if (str_starts_with($q->sql, 'update "pak_conversion_runs"')) {
+                throw $fault;
+            }
+        });
+        try {
+            app(ConversionService::class)->replace($this->actor, $request);
+            $this->fail('Fault swallowed.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame($fault, $error);
+        }
+        $this->assertSame(1, $attempts);
+        $this->assertSame(1, $discoveries);
+        $this->assertUnchanged($before);
+    }
+
+    public function test_exact_deadlock_during_discovery_has_no_owned_rollback_proof(): void
+    {
+        $request = $this->replacementRequest();
+        $before = $this->state();
+        $attempts = $discoveries = 0;
+        $fault = $this->databaseFault();
+        DB::connection()->beforeStartingTransaction(function () use (&$attempts) {
+            $attempts++;
+        });
+        DB::listen(function ($q) use (&$discoveries, $fault) {
+            if (str_starts_with($q->sql, 'select "person_id" from "pak_cases"')) {
+                $discoveries++;
+                throw $fault;
+            }
+        });
+        try {
+            app(ConversionService::class)->replace($this->actor, $request);
+            $this->fail('Discovery fault swallowed.');
+        } catch (QueryException $error) {
+            $this->assertSame($fault, $error);
+        }
+        $this->assertSame(0, $attempts);
+        $this->assertSame(1, $discoveries);
+        $this->assertUnchanged($before);
     }
 
     private function observeLockReads(): SQLiteGrammar
