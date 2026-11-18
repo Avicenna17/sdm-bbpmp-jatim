@@ -988,6 +988,41 @@ UAT Phase 02 wajib mencakup TC-PAK-029–038 dan TC-PAK-006. Kasus lintas fase d
 
 OD-07 business replacement policy tetap BUSINESS PENDING dan OD-08 replay/idempotency tetap DEFERRED. OD-11 kini RESOLVED dengan executable acceptance 02C.5 pada TC-PAK-042; bukan requirement retroaktif acceptance 02C.4. Umbrella TC-PAK-041 tidak mewajibkan runtime 02C.5/02C.6 pada acceptance 02C.4.
 
+### 02C.5.3 — Frozen stale assessment and explicit review acceptance
+
+**FROZEN contract, future executable gate.** Acuan: [02C.5.3 section 12 Phase 02C plan](plans/phase-02c-resolution-conversion-runs.md#02c53--frozen-stale-assessment-and-explicit-review-lifecycle). Ini perluasan TC-PAK-041, bukan TC ID/top-level slice baru, bukan klaim tests/implementation tersedia. 02C.5.1 coordination, 02C.5.2 preview/initial save, lalu 02C.5.3 remaining lifecycle sebelum closure; historical explicit-review grouping dalam 02C.6 kini clarified. Accepted replacement 02C.6/D.1–D.6 FINAL/frozen.
+
+- [ ] [02C.5.3] Exact read request hanya positive integer pak_case_id/run_id; unknown/missing/range fields ditolak. Saved requested range digunakan unchanged; historical exact SUPERSEDED read diperbolehkan tanpa retarget.
+- [ ] [02C.5.3] Exact output fields dan comparison enum mengikuti frozen contract. Read-only unchanged membutuhkan completed rebuild dan equality kedua hashes; unchanged tidak berarti approval/clear original issues.
+- [ ] [02C.5.3] Evaluation change terdeteksi; new Annual candidate arrival terdeteksi walaupun quarterly yang sebelumnya selected tidak berubah.
+- [ ] [02C.5.3] History interval/provenance/verification change atau supersession terdeteksi; relevant shared-master/rule semantic change dan existing contract versions terdeteksi sesuai manifest semantics.
+- [ ] [02C.5.3] DUK profile-only change dan mapping-only creation tidak mengubah semantic fingerprints. changed_groups hanya delapan approved manifest groups, bukan arbitrary labels.
+- [ ] [02C.5.3] Deterministic domain/integrity failure menghasilkan UNASSESSABLE dengan bounded code/nullable current hashes tanpa fabricated result. Technical/infrastructure/database/runtime failure escape; tidak dipersist atau dikemas sebagai UNASSESSABLE.
+- [ ] [02C.5.3] Satu coherent read snapshot; read-only zero writes/audit/status/review/case-version/first_used_at mutation, zero successor/repair, tanpa writer lock hanya untuk consistency.
+- [ ] [02C.5.3] Canonical assessment_fingerprint mengikat identity/status/case version/sequence/comparison/current hashes/null/groups/issue codes/failure_code; deterministic, tanpa wall-clock. Token bukan dependency/snapshot hash, conversion revision atau idempotency key.
+- [ ] [02C.5.3] Exact review request tujuh fields sesuai plan; strict missing/unknown/type/status/hash validation. Reason native string trimmed nonblank, tanpa arbitrary limit. Tolak desired status/actor/time/JSON/manifests/issues/results/dependency IDs.
+- [ ] [02C.5.3] PREVIEW + CHANGED → REQUIRES_REVIEW.
+- [ ] [02C.5.3] PREVIEW + deterministic domain UNASSESSABLE → REQUIRES_REVIEW.
+- [ ] [02C.5.3] PREVIEW + UNCHANGED reason-only mutation ditolak tanpa writes/audit.
+- [ ] [02C.5.3] REQUIRES_REVIEW + UNCHANGED, + CHANGED, dan + deterministic domain UNASSESSABLE masing-masing mengupdate assessment metadata dengan status tetap REQUIRES_REVIEW.
+- [ ] [02C.5.3] REQUIRES_REVIEW → PREVIEW impossible; SUPERSEDED mutation rejected; no automatic successor/approval/finalization/dependency-triggered review.
+- [ ] [02C.5.3] Null review_assessment sequence 0; successful mutation stores previous + 1. Exact JSON v1 schema; actor/time hanya existing columns. Malformed/unsupported non-null historical metadata rejected sebagai integrity condition, tidak dianggap 0 atau diperbaiki.
+- [ ] [02C.5.3] Active actor/pak.access dan setiap permission dalam complete ConversionService bundle required pada read dan mutation; inactive/missing permission ditolak service-layer tanpa mutation.
+- [ ] [02C.5.3] Wrong case/run boundary ditolak tanpa foreign evidence leak/retarget. Mutation hanya DRAFT dan finalized_at null; read-only historical access tidak memutasi case.
+- [ ] [02C.5.3] Parameterized stale case-version, run-status, assessment-sequence dan assessment-fingerprint rejection; masing-masing zero mutation/audit. Client content tidak authoritative; current assessment/token direbuild server-side.
+- [ ] [02C.5.3] Successful review tidak increment PakCase.lock_version; immutable PakConversionRun.case_lock_version dan revision_number tetap. Review sequence meningkat tepat sekali.
+- [ ] [02C.5.3] Canonical locks Case → Person → RuleSet/children → shared masters → exact run → evaluations → histories; scalar discovery outside owned root transaction. Dedicated participant, no late mapping lock/run-to-earlier-resource inversion; obsolete mapping plan fail closed sebagai coordination conflict.
+- [ ] [02C.5.3] Semua immutable raw run fields, manifest/fingerprints, requested context, original_issues, trace, revision identity dan seluruh period rows unchanged. Generic run/period mutation guards tetap menolak writes.
+- [ ] [02C.5.3] Bounded conditional update hanya lima approved lifecycle fields; tepat satu affected row. active_case_id dan supersession metadata unchanged; actor/server time benar.
+- [ ] [02C.5.3] Exactly one CONVERSION_RUN_REVIEW_ASSESSED dengan exact run subject/case reference; before/after/reason summaries sesuai plan, no supersedes_id/private payload. No CONVERSION_RUN_SAVED/REPLACED duplication.
+- [ ] [02C.5.3] Audit insertion failure rollback seluruh lifecycle update; prior metadata/status/sequence restored, no committed event.
+- [ ] [02C.5.3] Dua concurrent REQUIRES_REVIEW assessments dari sequence sama: hanya satu berhasil; lainnya reject stale tanpa lost update. Tidak memakai timestamp precision sebagai version.
+- [ ] [02C.5.3] Replacement-first: target SUPERSEDED dan review reject exact target. Assessment-first: existing replacement tetap dapat supersede PREVIEW/REQUIRES_REVIEW sesuai preconditions frozen; no case increment hanya untuk memblok replacement.
+- [ ] [02C.5.3] Dependency writer change setelah read assessment sebelum mutation memicu authoritative re-assessment dan stale token handling, bukan blind persistence dari client.
+- [ ] [02C.5.3] Single attempt untuk mutation, termasuk deadlock/technical failure; uncertain commit tidak retry otomatis. Owned Laravel/PDO transaction dan callback cleanup teruji; no partial persistence.
+- [ ] [02C.5.3] Initial save/replacement/lifecycle immutability dan concurrency D.1–D.6 regression tetap green. Live concurrency proof memakai independent processes/observer, bukan SQLite/timing-only claim.
+- [ ] [02C.5.3] Tidak ada schema/migration, permission, Composer dependency atau UI change. OD-07 BUSINESS PENDING dan OD-08 DEFERRED tetap.
+
 ### OD-14 — planned initial-save consistency acceptance [02C.5.2.B]
 
 Bagian ini memperluas umbrella TC-PAK-041, bukan TC ID baru atau gate retroaktif 02C.4/preview 02C.5.2.A. Acuan tunggal saveability/preconditions/retry adalah [OD-14 Phase 02C plan](plans/phase-02c-resolution-conversion-runs.md#od-14--resolved-initial-authoritative-save-consistency-contract). Semua berikut planned executable acceptance, belum implementasi.
