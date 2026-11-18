@@ -3,7 +3,9 @@
 // Test-only process entrypoint. Credentials arrive on stdin and are never returned.
 use App\Domain\Import\ImportService;
 use App\Domain\Pak\DTOs\ConversionReplaceRequest;
+use App\Domain\Pak\DTOs\ConversionReviewRequest;
 use App\Domain\Pak\DTOs\ConversionSaveRequest;
+use App\Domain\Pak\Services\ConversionReviewService;
 use App\Domain\Pak\Services\ConversionService;
 use App\Domain\Pak\Services\EmployeeHistoryService;
 use App\Domain\Pak\Services\FunctionalMasterService;
@@ -35,13 +37,16 @@ config(['database.default' => 'mysql', 'database.connections.mysql' => $input['d
     'filesystems.disks.local' => ['driver' => 'local', 'root' => $input['root'], 'visibility' => 'private', 'throw' => false]]);
 Connection::resolverFor('mysql', fn ($pdo, $database, $prefix, $config) => new ConcurrencyConnection($pdo, $database, $prefix, $config));
 DB::purge('mysql');
-if (in_array($input['operation'], ['conversion', 'conversion_replace'], true)) {
+if (in_array($input['operation'], ['conversion', 'conversion_replace', 'conversion_review'], true)) {
     if (getenv('PAK_CONCURRENCY') !== '1' || getenv('PAK_DISPOSABLE_DB') !== 'pak_02a1_test'
         || (int) $input['db']['port'] !== 33318
         || DB::selectOne('SELECT DATABASE() AS db')->db !== 'pak_02a1_test'
         || ! str_starts_with(DB::selectOne('SELECT VERSION() AS v')->v, '10.5.11-MariaDB')) {
         throw new RuntimeException('Verified disposable MariaDB required.');
     }
+}
+if ($input['operation'] === 'conversion_review' && getenv('PAK_CONCURRENCY_PORT') !== (string) $input['db']['port']) {
+    throw new RuntimeException('Explicit disposable concurrency port required.');
 }
 DB::statement('SET SESSION innodb_lock_wait_timeout = 10');
 $connectionId = (int) DB::selectOne('SELECT CONNECTION_ID() AS id')->id;
@@ -80,7 +85,7 @@ $result = ['success' => false, 'issue_code' => null, 'batch_id' => $input['batch
     'status' => null, 'evaluation_id' => null, 'connection_id' => $connectionId, 'pid' => getmypid()];
 try {
     $actor = User::findOrFail($input['actor']);
-    if (in_array($input['operation'], ['conversion', 'conversion_replace', 'correct', 'history', 'master', 'duk'], true)) {
+    if (in_array($input['operation'], ['conversion', 'conversion_replace', 'conversion_review', 'correct', 'history', 'master', 'duk'], true)) {
         $result['attempts'] = 0;
         DB::connection()->beforeStartingTransaction(function () use (&$result) {
             $result['attempts']++;
@@ -94,6 +99,11 @@ try {
         $run = app(ConversionService::class)->replace($actor, ConversionReplaceRequest::from($input['request']));
         $result['run_id'] = $run->id;
         $result['status'] = $run->status->value;
+    } elseif ($input['operation'] === 'conversion_review') {
+        $run = app(ConversionReviewService::class)->assessReview($actor, ConversionReviewRequest::from($input['request']));
+        $result['run_id'] = $run->id;
+        $result['status'] = $run->status->value;
+        $result['assessment_sequence'] = $run->review_assessment['assessment_sequence'];
     } elseif ($input['operation'] === 'commit') {
         $batch = app(SkpImportCommitService::class)->commit($actor, $input['batch_id']);
         $result += ['committed_by' => $batch->committed_by, 'committed_at' => $batch->committed_at->format('Y-m-d H:i:s'),
@@ -125,7 +135,7 @@ try {
     }
     $result['success'] = true;
 } catch (Throwable $error) {
-    if ($input['operation'] === 'conversion_replace') {
+    if (in_array($input['operation'], ['conversion_replace', 'conversion_review'], true)) {
         $result['failure_class'] = $error::class;
         // Expose only this fixed, non-sensitive reason so drift is distinguishable from stale hashes.
         if ($error instanceof ValidationException && $error->errors() === [
@@ -135,16 +145,16 @@ try {
         }
     }
     $result['validation_fields'] = $error instanceof ValidationException ? array_keys($error->errors()) : [];
-    $result['issue_code'] = in_array($input['operation'], ['conversion', 'conversion_replace'], true)
+    $result['issue_code'] = in_array($input['operation'], ['conversion', 'conversion_replace', 'conversion_review'], true)
         ? ($error instanceof ValidationException ? 'VALIDATION_FAILED' : 'UNEXPECTED_FAILURE')
         : ($error instanceof ValidationException ? (array_values($error->errors())[0][0] ?? 'VALIDATION_FAILED')
             : ($error->issue_code ?? 'UNEXPECTED_FAILURE'));
 }
-if (in_array($input['operation'], ['conversion', 'conversion_replace', 'correct', 'history', 'master', 'duk'], true)) {
+if (in_array($input['operation'], ['conversion', 'conversion_replace', 'conversion_review', 'correct', 'history', 'master', 'duk'], true)) {
     $result['transaction_level'] = DB::transactionLevel();
     $result['pdo_active'] = DB::connection()->getPdo()->inTransaction();
 }
-if ($input['operation'] === 'conversion_replace') {
+if (in_array($input['operation'], ['conversion_replace', 'conversion_review'], true)) {
     $result['pending_callbacks'] = app('db.transactions')->getPendingTransactions()->count();
     $result['committed_callbacks'] = app('db.transactions')->getCommittedTransactions()->count();
 }
