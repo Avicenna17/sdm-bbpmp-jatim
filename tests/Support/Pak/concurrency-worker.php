@@ -127,6 +127,12 @@ try {
 } catch (Throwable $error) {
     if ($input['operation'] === 'conversion_replace') {
         $result['failure_class'] = $error::class;
+        // Expose only this fixed, non-sensitive reason so drift is distinguishable from stale hashes.
+        if ($error instanceof ValidationException && $error->errors() === [
+            'snapshot' => ['Dependency lock plan changed. Obtain a new preview.'],
+        ]) {
+            $result['lock_plan_errors'] = $error->errors();
+        }
     }
     $result['validation_fields'] = $error instanceof ValidationException ? array_keys($error->errors()) : [];
     $result['issue_code'] = in_array($input['operation'], ['conversion', 'conversion_replace'], true)
