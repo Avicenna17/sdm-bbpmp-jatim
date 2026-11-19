@@ -14,6 +14,7 @@ use App\Domain\Pak\Services\PerformanceEvaluationService;
 use App\Domain\Pak\Services\SkpFingerprintSerializer;
 use App\Domain\Pak\Services\SkpImportCommitService;
 use App\Models\ImportBatch;
+use App\Models\PakCase;
 use App\Models\PerformanceEvaluation;
 use App\Models\Person;
 use App\Models\User;
@@ -115,7 +116,7 @@ $result = ['success' => false, 'issue_code' => null, 'batch_id' => $input['batch
     'status' => null, 'evaluation_id' => null, 'connection_id' => $connectionId, 'pid' => getmypid()];
 try {
     $actor = User::findOrFail($input['actor']);
-    if (in_array($input['operation'], ['conversion', 'conversion_replace', 'conversion_review', 'correct', 'history', 'master', 'duk'], true)) {
+    if (in_array($input['operation'], ['conversion', 'conversion_replace', 'conversion_review', 'correct', 'history', 'master', 'duk', 'initial', 'case_refresh'], true)) {
         $result['attempts'] = 0;
         DB::connection()->beforeStartingTransaction(function () use (&$result) {
             $result['attempts']++;
@@ -147,6 +148,10 @@ try {
         $result['status'] = ImportBatch::findOrFail($input['batch_id'])->status;
     } elseif ($input['operation'] === 'case') {
         $case = app(PakCaseService::class)->create($actor, $input['case']);
+        $result['case_id'] = $case->id;
+    } elseif ($input['operation'] === 'case_refresh') {
+        $case = app(PakCaseService::class)->refresh($actor, PakCase::findOrFail($input['case_id']),
+            $input['case'], $input['expected_version'], $input['preview_hash'], $input['reason']);
         $result['case_id'] = $case->id;
     } elseif ($input['operation'] === 'master') {
         app(FunctionalMasterService::class)->save($actor, $input['type'], $input['master'], $input['master_id']);
@@ -180,7 +185,7 @@ try {
         : ($error instanceof ValidationException ? (array_values($error->errors())[0][0] ?? 'VALIDATION_FAILED')
             : ($error->issue_code ?? 'UNEXPECTED_FAILURE'));
 }
-if (in_array($input['operation'], ['conversion', 'conversion_replace', 'conversion_review', 'correct', 'history', 'master', 'duk'], true)) {
+if (in_array($input['operation'], ['conversion', 'conversion_replace', 'conversion_review', 'correct', 'history', 'master', 'duk', 'initial', 'case_refresh'], true)) {
     $result['transaction_level'] = DB::transactionLevel();
     $result['pdo_active'] = DB::connection()->getPdo()->inTransaction();
 }
@@ -189,4 +194,15 @@ if (in_array($input['operation'], ['conversion_replace', 'conversion_review'], t
     $result['committed_callbacks'] = app('db.transactions')->getCommittedTransactions()->count();
 }
 $result['diagnostics'] = ConcurrencyConnection::$diagnostics;
+// refresh() uses DB::transaction(), which also logs ordinary business rejection.
+// Report its exact, clean case-precondition rejection through validation_fields;
+// retain every query failure, chained exception, and unexpected transaction diagnostic.
+if ($input['operation'] === 'case_refresh' && isset($error) && $error instanceof ValidationException
+    && $error->errors() === ['case' => ['Draft berubah/terkunci atau person berbeda. Muat ulang.']]
+    && $result['transaction_level'] === 0 && ! $result['pdo_active']
+    && $result['diagnostics'] === [['transaction_failure' => [
+        ['class' => ValidationException::class, 'code' => 0, 'sqlstate' => null, 'vendor' => null],
+    ], 'level' => 0, 'validation_fields' => ['case']]]) {
+    $result['diagnostics'] = [];
+}
 echo json_encode($result, JSON_THROW_ON_ERROR).PHP_EOL;
