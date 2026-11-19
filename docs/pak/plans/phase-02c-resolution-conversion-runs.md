@@ -757,7 +757,7 @@ Selected quarterly yang tidak berubah tidak membuktikan selection masih valid se
 
 ### 02C.5.3 — FROZEN stale assessment and explicit review lifecycle
 
-**Authority:** keputusan eksplisit client pada baseline `8748f4c068ab41e2dac80731c5def424e97abeb8`. Ini documentation contract freeze, bukan klaim API/tests sudah diimplementasikan. 02C.5.3 adalah remaining lifecycle delivery setelah 02C.5.2 dan sebelum Phase 02C closure, bukan top-level slice ketujuh. Historical planning yang mengelompokkan explicit review bersama 02C.6 tetap merupakan historical delivery context; ownership executable assessment sekarang 02C.5.3. Replacement/recalculation dan concurrency proof 02C.6 tetap FINAL dan frozen.
+**Authority:** keputusan eksplisit client pada baseline `8748f4c068ab41e2dac80731c5def424e97abeb8`. Pada checkpoint tersebut, ini documentation contract freeze, bukan klaim API/tests sudah diimplementasikan. Implementasi dan executable acceptance kemudian telah diterima; lihat closure section 23. 02C.5.3 adalah remaining lifecycle delivery setelah 02C.5.2 dan sebelum Phase 02C closure, bukan top-level slice ketujuh. Historical planning yang mengelompokkan explicit review bersama 02C.6 tetap merupakan historical delivery context; ownership executable assessment sekarang 02C.5.3. Replacement/recalculation dan concurrency proof 02C.6 tetap FINAL dan frozen.
 
 #### Read-only API dan request
 
@@ -906,7 +906,7 @@ Fingerprints tidak diwajibkan di audit. Tidak ada manifest/full snapshots/NIP/pr
 
 Assessment-first boleh mengubah PREVIEW menjadi REQUIRES_REVIEW; replacement tetap boleh supersede kedua status sesuai frozen contract. Replacement-first membuat exact target SUPERSEDED; assessment mutation reject. Tidak menaikkan case version hanya untuk menginvalidasi replacement request. Tidak mengubah replacement request, target/chain validation, retry, audit atau concurrency matrix D.1–D.6.
 
-OD-07/BR-SKP-008 tetap **BUSINESS PENDING**; OD-08 tetap **DEFERRED**. No migration/schema change required: existing columns sudah mendukung lifecycle. No permission change, Composer dependency atau UI. Future executable acceptance berada pada TC-PAK-041 subsection 02C.5.3; documentation freeze ini tidak mengklaim implementation/tests telah tersedia.
+OD-07/BR-SKP-008 tetap **BUSINESS PENDING**; OD-08 tetap **DEFERRED**. No migration/schema change required: existing columns sudah mendukung lifecycle. No permission change, Composer dependency atau UI. Pada checkpoint freeze, executable acceptance TC-PAK-041 subsection 02C.5.3 masih future work. Gate tersebut kini telah dipenuhi oleh accepted A/B/C.1–C.7; provenance freeze tetap dipertahankan, lihat section 23.
 
 ## 13. 02C.6 — Replacement/Recalculation
 
@@ -926,9 +926,11 @@ OD-07/BR-SKP-008 tetap **BUSINESS PENDING**; OD-08 tetap **DEFERRED**. No migrat
 
 BR-SKP-008 tetap pending untuk kebijakan penggantian calculation quarterly setelah annual tersedia.
 
-Technical replacement chain tidak mengesahkan business replacement tersebut. Tidak ada auto replacement.
+Technical replacement chain tidak mengesahkan business replacement tersebut. Tidak ada auto replacement. Applicability closure: **CARRY-FORWARD / NON-BLOCKING**, tanpa menyelesaikan kebijakan bisnis; lihat section 23.
 
 ### OD-08 — Deferred decision
+
+**Catatan closure:** batas initial-only pada paragraf historis berikut tetap berlaku untuk 02C.5.2, bukan penyangkalan accepted explicit replacement 02C.6. OD-08 tetap DEFERRED / CARRY-FORWARD / NON-BLOCKING untuk 02C.5.3, 02C.6 dan Phase 02C closure; lihat section 22–23.
 
 OD-08 tetap DEFERRED untuk replay/idempotency dan later lifecycle API, termasuk 02C.6 bila applicable. Penyelesaiannya bukan prerequisite API initial-only 02C.5.2: case dengan run apa pun wajib ditolak sebagaimana section 11. Jangan menjanjikan idempotent success, replay, replacement/recalculation, revision allocation, return-existing-run, atau menyalin SKP COMMITTED fast path.
 
@@ -1156,8 +1158,8 @@ Tidak ada slice ketujuh. 02C.5.1/02C.5.2/02C.5.3 hanya decomposition delivery in
 | OD-04 History end/gap dalam bulan | **RESOLVED** | Inclusive interval; continuity/no-overlap seluruh bulan sebelum latest-TMT whole-month selection; gate 02C.3 mengikuti contract di atas |
 | OD-05 Person coordination | **RESOLVED technical contract** | Complete protocol sebelum acceptance 02C.5; real proof 02C.6 |
 | OD-06 Stale/review | **RESOLVED; 02C.5.3 FROZEN** | Exact DTOs, tri-state comparison, assessment token/sequence, no case increment, single-attempt atomic review; section 12 |
-| OD-07 Annual-late replacement | **BUSINESS PENDING** | BR-SKP-008 tetap; no auto replacement |
-| OD-08 Replay/idempotency | **DEFERRED** | Bukan prerequisite 02C.5.3, 02C.6, atau Phase 02C closure; tidak ada replay, idempotent-success, return-existing-run, atau automatic successor behavior yang diimplementasikan |
+| OD-07 Annual-late replacement | **BUSINESS PENDING** | **CARRY-FORWARD / NON-BLOCKING** untuk Phase 02C closure; kapan/bagaimana annual-late memerlukan revision/replacement tetap pending (BR-SKP-008); no automatic update/recalculation/successor/replacement |
+| OD-08 Replay/idempotency | **DEFERRED** | **CARRY-FORWARD / NON-BLOCKING**; bukan prerequisite 02C.5.3, 02C.6, atau Phase 02C closure; tidak ada replay, idempotent-success, return-existing-run, atau automatic successor behavior yang diimplementasikan |
 | OD-09 Persistence detail | **RESOLVED** | Runs + periods; immutable manifest/snapshots, TEXT exact rational, approved projection/version schema; gate 02C.4 |
 | OD-10 Audit/review authorization | **RESOLVED for schema/auth/audit mutation boundary** | Existing permission bundle; assessment fields/event, explicit lifecycle transitions and atomic bounded audit; 02C.5.3 details section 12; no approval/finalization |
 | OD-11 Rule validity behavior | **RESOLVED** | Explicit case rule set; known inclusive validity covers entire request; NULL = unknown; failure diagnostics-only tanpa angka/total, conditional review save; precedence dan child outcomes mengikuti section 11; executable gate 02C.5/TC-PAK-042 |
@@ -1169,4 +1171,55 @@ Tidak ada slice ketujuh. 02C.5.1/02C.5.2/02C.5.3 hanya decomposition delivery in
 | Calculation snapshot immutability | **RESOLVED invariant** | Lifecycle metadata saja yang boleh dimutasi melalui authorized service |
 | 02C.5 delivery decomposition | **RESOLVED delivery note** | Coordination hardening → preview/initial save → stale assessment/explicit review (02C.5.3); bukan slice tambahan |
 
-Dokumen ini merupakan planning-only implementation contract. Approval plan ini tidak mengotorisasi perubahan source, migration, test executable, atau implementasi Phase 02C di luar instruksi slice berikutnya dan gate yang telah ditetapkan.
+Pada approval awal, dokumen ini merupakan planning-only implementation contract; approval tersebut tidak mengotorisasi implementasi di luar instruksi slice dan gate yang ditetapkan. Acceptance implementasi berikutnya dicatat pada closure checkpoint di bawah, tanpa mengubah provenance keputusan terdahulu.
+
+## 23. Phase 02C closure
+
+**Status: FINAL — berlaku setelah commit dokumentasi closure ini.** Technical acceptance baseline: `de40fef` (`test: close Phase 02C missing live concurrency gates`); accepted review closure sebelumnya: `ba81127`. Final read-only closure re-audit menghasilkan **PHASE 02C CLOSURE READY**. Closure mencatat evidence yang sudah diterima, bukan implementasi atau business capability baru.
+
+02C.1, 02C.2, 02C.3, 02C.4, 02C.5.1, 02C.5.2, dan 02C.5.3 **FINAL**; 02C.6 **FINAL / FROZEN**, termasuk replacement D.1–D.6. Tetap enam top-level slices: 02C.5.1/.2/.3 adalah internal delivery decomposition. Semua acceptance criteria section 21 terpenuhi.
+
+### Accepted 02C.5.3 chain
+
+| Checkpoint | Evidence commit |
+|---|---|
+| Contract freeze | `9eca6dd` |
+| A — Read-only stale assessment | `dea6b61` |
+| B — Explicit review mutation | `4ace568` |
+| C.1 — Review ↔ Review | `cb819ae` |
+| C.2 — Review ↔ Replacement | `06fb694` |
+| C.3 — Review ↔ SKP/Evaluation | `c59b380` |
+| C.4 — Review ↔ Position History | `8fe2f06` |
+| C.5 — Review ↔ Shared Master | `4945981` |
+| C.6 — Review ↔ DUK/Person | `91fa49d` |
+| C.7 — Review ↔ Mapping-plan Drift | `ba81127` |
+
+API/service/tests kini implemented dan accepted. Pernyataan future executable work pada checkpoint freeze menjelaskan keadaan saat itu, bukan status implementasi saat closure; kontrak lifecycle tidak berubah.
+
+### Required MariaDB evidence closure
+
+Seluruh required races section 18 mempunyai accepted independent-process evidence:
+
+| Required race | Executable evidence (`tests/Feature/Pak/`) |
+|---|---|
+| Two saves same case | `ConversionInitialSaveConcurrencyTest` |
+| Two replacements same predecessor | `ConversionReplacementConcurrencyTest` |
+| Source correction versus save | `ConversionDependencyConcurrencyTest` |
+| Annual insertion versus save | `ConversionAnnualInsertionConcurrencyTest` — `de40fef` |
+| History mutation versus save | `ConversionPositionHistoryConcurrencyTest` |
+| Case period/rule-set change versus save | `ConversionCaseRefreshConcurrencyTest` — `de40fef` |
+| Rule first-use/child-write regression | `ConversionRuleConcurrencyTest` |
+| 02A import/import, correction/correction, import/correction | `SkpImportConcurrencyTest` |
+
+Dua missing gates terakhir ditutup oleh `de40fef`: accepted independent verification **6 passed / 572 assertions**. Annual writer memakai `PerformanceEvaluationService::createInitial()` dan actual `people PRIMARY` serialization. Annual-first menolak frozen save pada `snapshot` tanpa conversion persistence. Conversion-first menyimpan prior Q3; annual kemudian committed, fresh preview memilih annual dan semantic hashes berubah, tetapi historical run tetap immutable tanpa automatic review/replacement/successor.
+
+Period maupun rule-set writer memakai `PakCaseService::refresh()` dan actual `pak_cases PRIMARY` serialization. Refresh-first menaikkan versi sekali dan menolak frozen conversion pada `case`; conversion-first menolak stale refresh tanpa partial case/snapshot/audit state. Rule B first-use marker hanya persisted bila refresh berhasil.
+
+Verification context: isolated MariaDB `1205` pada regression replacement terdahulu tidak terulang dalam dua accepted focused reruns: **14 passed + 10 expected skips / 2103 assertions**, lalu **14 passed + 10 expected skips / 2095 assertions**. Ini bukan temuan production defect dan bukan jaminan semua environment bebas timeout. Accepted lint, Pint, dan diff/whitespace checks PASS; `de40fef` tidak mengubah app/database/docs.
+
+### Carry-forward dan batas closure
+
+- **OD-07 / BR-SKP-008 tetap BUSINESS PENDING**, **CARRY-FORWARD / NON-BLOCKING** untuk closure 02C berdasarkan arahan eksplisit client dan accepted re-audit. Keputusan yang belum dikunci adalah **kapan/bagaimana** Evaluasi Akhir yang datang kemudian mengharuskan revision/replacement historical conversion berbasis quarterly fallback. Tidak ada automatic update, recalculation, successor, atau replacement. Explicit assessment/replacement adalah mekanisme teknis, bukan automatic business trigger; annual insertion proof tidak menyelesaikan BR-SKP-008.
+- **OD-08 tetap DEFERRED**, **CARRY-FORWARD / NON-BLOCKING**; bukan prerequisite 02C.5.3, 02C.6, atau Phase 02C closure. Tidak ada replay, idempotent-success, return-existing-run, atau automatic successor behavior.
+- BR-PERIOD-003, BR-APPOINT-008, BR-KJ-005, dan BR-BAL-003 tetap pending, outside/non-blocking untuk closure 02C menurut accepted re-audit; tidak ada perubahan business status.
+- Closure tidak menyatakan PAK approved/finalized, tidak menambahkan UI atau approval/finalization/penetapan workflow. Deployment/UAT tetap later scope (Phase 02E); disposable MariaDB **10.5.11** evidence bukan klaim production deployment **10.5.10** telah diuji.

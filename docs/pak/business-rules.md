@@ -189,6 +189,8 @@ Record dapat:
 
 **PENDING:** jika conversion/draft telah dihitung memakai triwulan lalu Evaluasi Akhir tersedia kemudian, kebijakan refresh/revision terhadap calculation lama belum dikunci, termasuk kapan dan bagaimana penggantian harus dilakukan. Phase 02 tidak melakukan auto-update/recalculation atau otomatis mengganti run lama. Source evidence, predikat, coverage, range penerapan dan provenance saat calculation tetap dicatat. Kontrak teknis revision chain tidak dengan sendirinya mengesahkan kebijakan bisnis penggantian ini.
 
+**Applicability closure Phase 02C:** tetap **PENDING BUSINESS DECISION** setelah Phase 02C; **CARRY-FORWARD / NON-BLOCKING** untuk closure sesuai arahan client dan accepted re-audit baseline `de40fef`. Batas Phase 02 tetap tanpa automatic update, recalculation, successor, atau replacement. Explicit assessment/replacement capability tidak menentukan kapan/bagaimana business trigger penggantian berlaku; annual insertion concurrency proof tidak menyelesaikan keputusan ini. Lihat [formal closure](plans/phase-02c-resolution-conversion-runs.md#23-phase-02c-closure).
+
 ---
 
 # D. Periode PAK
