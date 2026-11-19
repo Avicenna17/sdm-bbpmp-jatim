@@ -117,6 +117,6 @@ class PakCaseResource extends Resource
 
     public static function getPages(): array
     {
-        return ['index' => PakCaseResource\Pages\ListCases::route('/'), 'create' => PakCaseResource\Pages\CreateCase::route('/create'), 'view' => PakCaseResource\Pages\ViewCase::route('/{record}'), 'edit' => PakCaseResource\Pages\EditCase::route('/{record}/edit')];
+        return ['conversion' => PakCaseResource\Pages\CaseConversion::route('/{record}/conversion'), 'index' => PakCaseResource\Pages\ListCases::route('/'), 'create' => PakCaseResource\Pages\CreateCase::route('/create'), 'view' => PakCaseResource\Pages\ViewCase::route('/{record}'), 'edit' => PakCaseResource\Pages\EditCase::route('/{record}/edit')];
     }
 }

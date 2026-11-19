@@ -2,7 +2,9 @@
 
 namespace App\Filament\Pak\Resources\PakCaseResource\Pages;
 
+use App\Domain\Pak\Queries\ConversionRunQuery;
 use App\Filament\Pak\Resources\PakCaseResource;
+use Filament\Actions\Action;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
@@ -11,6 +13,13 @@ use Filament\Resources\Pages\ViewRecord;
 class ViewCase extends ViewRecord
 {
     protected static string $resource = PakCaseResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [Action::make('conversion')->label('Konversi')
+            ->visible(fn () => ConversionRunQuery::allows(auth()->user()))
+            ->url(fn () => PakCaseResource::getUrl('conversion', ['record' => $this->record->id]))];
+    }
 
     public function infolist(Infolist $infolist): Infolist
     {
