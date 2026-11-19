@@ -81,6 +81,36 @@ if ($input['barrier'] === 'create') {
         }
     });
 }
+// C.7 only: observe the completed scalar SELECT, then pause after discover() returns,
+// immediately before the owned transaction starts. Existing lock barriers are untouched.
+if ($input['operation'] === 'conversion_review' && $input['barrier'] === 'after_mapping_discovery') {
+    $mappingRead = false;
+    DB::listen(function ($event) use (&$mappingRead) {
+        $sql = strtolower($event->sql);
+        if (str_starts_with($sql, 'select ') && str_contains($sql, 'functional_position_levels')
+            && ! str_contains($sql, 'for update') && ! str_contains($sql, 'lock in share mode')
+            && DB::transactionLevel() === 0 && ! DB::connection()->getPdo()->inTransaction()) {
+            $mappingRead = true;
+        }
+    });
+    DB::connection()->beforeStartingTransaction(function () use (&$once, &$mappingRead, $input, $connectionId, $signal, $wait) {
+        if (! $once) {
+            return;
+        }
+        $once = false;
+        if (! $mappingRead || DB::transactionLevel() !== 0 || DB::connection()->getPdo()->inTransaction()) {
+            throw new RuntimeException('INVALID_DISCOVERY_BARRIER');
+        }
+        file_put_contents($input['root'].'/'.$input['worker'].'.discovery', json_encode([
+            'mapping_select_completed' => true, 'transaction_level' => DB::transactionLevel(),
+            'pdo_active' => DB::connection()->getPdo()->inTransaction(),
+            'pid' => getmypid(), 'connection_id' => $connectionId,
+        ], JSON_THROW_ON_ERROR));
+        $signal('held');
+        $wait();
+    });
+}
+
 $result = ['success' => false, 'issue_code' => null, 'batch_id' => $input['batch_id'] ?? null,
     'status' => null, 'evaluation_id' => null, 'connection_id' => $connectionId, 'pid' => getmypid()];
 try {
