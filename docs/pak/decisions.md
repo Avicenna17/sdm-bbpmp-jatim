@@ -178,3 +178,19 @@ No migration/schema change, permission change, Composer dependency atau UI. **OD
 - **OD-08 tetap DEFERRED**, **CARRY-FORWARD / NON-BLOCKING**, bukan prerequisite 02C.5.3, 02C.6 atau Phase 02C closure. Tidak ada replay/idempotent-success/return-existing-run/automatic successor.
 - BR-PERIOD-003, BR-APPOINT-008, BR-KJ-005 dan BR-BAL-003 tetap pending dan outside/non-blocking untuk closure 02C; tidak diselesaikan oleh checkpoint ini.
 - Tidak ada Phase 02C UI, approval/finalization/penetapan workflow atau klaim PAK approved/finalized. Deployment/UAT tetap later scope; evidence disposable MariaDB 10.5.11 tidak membuktikan production deployment MariaDB 10.5.10. Closure ini documentation-only.
+
+
+# Phase 02D implementation plan / contract freeze
+
+Checkpoint setelah formal closure 02C `edfd875` (technical acceptance `de40fef`): [Phase 02D plan](plans/phase-02d-ui-evidence-audit-presentation.md) menjadi detailed authoritative plan **FROZEN FOR IMPLEMENTATION — berlaku setelah commit dokumentasi plan/freeze ini**, dengan conditional gates, bukan status implemented/FINAL.
+
+- Internal deliveries tetap 02D.1 SKP Import & Import History UI; 02D.2 Private Evidence UI; 02D.3 Conversion / Assessment / Review / Replacement UI; 02D.4 Audit Presentation + Dashboard Review. Tidak ada top-level slice baru atau 02D.5.
+- Final acceptance 02D.1 memerlukan sanitized representative client workbook dan accepted adapter; production mapping tidak boleh ditebak. Ini non-blocking untuk plan freeze dan 02D.3.
+- Sebelum implementasi 02D.2, evidence ownership/persistence/lifecycle harus dibekukan. Dedicated attachment berbeda dari batch workbook provenance; schema/model changes memerlukan approval eksplisit. Plan tidak mengotorisasi migration.
+- Urutan tidak harus numerik: 02D.3 boleh pertama setelah plan diterima, tanpa dependency pada adapter/evidence persistence; 02D.4 normalnya mengikuti destination D3. Rule child-editor UX dibekukan sebelum menyentuh PakRuleSetResource.
+- UI menggunakan API accepted, termasuk `saveInitial()` (bukan historical `savePreview()`), server authority/complete permission bundle, exact nested ownership, private record-authorized download, safe audit whitelist, serta latest-only dashboard dengan denied “—”/zero-query dan authorized-empty “0”.
+- Historical umbrella future-work wording tetap berlaku pada checkpoint asal dan telah diberi current-status clarification; tidak mengubah provenance atau kontrak FINAL 02C.
+- OD-07/BR-SKP-008 tetap BUSINESS PENDING; OD-08 DEFERRED; pending business rules lain tidak diselesaikan. Tidak ada approval/finalization/penetapan, annual auto replacement, replay/idempotent-success, atau employee portal baru.
+- Focused tests wajib per slice; whole-phase regression, final MySQL matrix, schema compatibility, UAT dan final verification tetap 02E. Tidak ada klaim production deployment.
+
+Checkpoint ini documentation-only; tidak mengubah source/tests/routes/schema/permissions atau accepted backend semantics.

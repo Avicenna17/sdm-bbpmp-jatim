@@ -1,5 +1,9 @@
 # Final Plan Phase 02 — SKP & Conversion
 
+> **Checkpoint terkini — Phase 02D plan freeze (baseline `edfd875`):** 02A–02C sudah implemented/accepted; Phase 02C formally FINAL pada `edfd875` (technical acceptance `de40fef`). Pernyataan “implementasi belum dimulai” dan future service names di bawah adalah provenance checkpoint awal, bukan status sekarang. Detailed authoritative plan berikutnya adalah [Phase 02D — UI / Evidence / Audit Presentation](phase-02d-ui-evidence-audit-presentation.md), **FROZEN FOR IMPLEMENTATION — berlaku setelah commit dokumentasi plan/freeze ini** dengan conditional workbook/adapter gate 02D.1 dan evidence representation gate 02D.2. Ini tidak mengklaim implementasi 02D, UAT, atau deployment.
+>
+> Historical `savePreview(...)` merujuk rancangan lama; implementasi baru harus memakai accepted `ConversionService::saveInitial()` dan `replace()` secara terpisah beserta DTO existing. Historical source-selection UI/affected-run review wording tidak memberi browser authority atau automatic review mutation: source ditentukan server dan review tetap explicit sesuai kontrak FINAL 02C. Batch workbook provenance bukan dedicated evaluation attachment; desain evidence persistence tetap gate 02D.2.
+
 **Status: Final Plan Phase 02 telah disetujui dan disimpan sebagai dokumentasi repository pada branch `feature/pak-phase-02`; implementasi belum dimulai.** Checkpoint dokumentasi ini tidak mengubah source aplikasi, migration, dependency implementasi, atau deployment.
 
 ## 1. Baseline, tujuan, dan boundary
