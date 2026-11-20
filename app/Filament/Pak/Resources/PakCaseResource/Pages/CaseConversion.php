@@ -5,6 +5,7 @@ namespace App\Filament\Pak\Resources\PakCaseResource\Pages;
 use App\Domain\Pak\Authorization\PakEmployeeAuthorization as Access;
 use App\Domain\Pak\DTOs\ConversionAssessmentRequest;
 use App\Domain\Pak\DTOs\ConversionPreviewRequest;
+use App\Domain\Pak\DTOs\ConversionReplaceRequest;
 use App\Domain\Pak\DTOs\ConversionReviewRequest;
 use App\Domain\Pak\DTOs\ConversionSaveRequest;
 use App\Domain\Pak\Exceptions\ConversionRuleException;
@@ -15,7 +16,10 @@ use App\Domain\Pak\Services\ConversionReviewService;
 use App\Domain\Pak\Services\ConversionService;
 use App\Filament\Pak\Resources\PakCaseResource;
 use App\Filament\Pak\Support\ConversionPresenter;
+use App\Models\PakCase;
+use App\Models\PakConversionRun;
 use Filament\Resources\Pages\Page;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -62,8 +66,176 @@ class CaseConversion extends Page
 
     public string $reviewReason = '';
 
+    #[Locked]
+    public ?int $replacementPredecessorRunId = null;
+
+    #[Locked]
+    public ?string $replacementRequestedStart = null;
+
+    #[Locked]
+    public ?string $replacementRequestedEnd = null;
+
+    #[Locked]
+    public ?int $replacementExpectedCaseLockVersion = null;
+
+    #[Locked]
+    public ?string $replacementExpectedDependencyFingerprint = null;
+
+    #[Locked]
+    public ?string $replacementExpectedSnapshotFingerprint = null;
+
+    #[Locked]
+    public array $replacementPreviewDisplay = [];
+
+    public string $revisionReason = '';
+
+    private function clearReplacement(bool $clearReason = true): void
+    {
+        $this->replacementPredecessorRunId = $this->replacementExpectedCaseLockVersion = null;
+        $this->replacementRequestedStart = $this->replacementRequestedEnd = null;
+        $this->replacementExpectedDependencyFingerprint = $this->replacementExpectedSnapshotFingerprint = null;
+        $this->replacementPreviewDisplay = [];
+        if ($clearReason) {
+            $this->revisionReason = '';
+        }
+        $this->resetErrorBag('replacement');
+    }
+
+    private function authorizeReplacement(): void
+    {
+        if (! $this->canCalculate()) {
+            $this->clearReplacement();
+            abort(403);
+        }
+    }
+
+    private function replacementEligible(PakCase $case, ?PakConversionRun $run, ?int $tip): bool
+    {
+        return $case->status === 'DRAFT' && $case->finalized_at === null && $run !== null
+            && (int) $run->pak_case_id === $case->id && (int) $run->active_case_id === $case->id
+            && $run->id === $tip && $run->successor === null
+            && in_array($run->status->value, ['PREVIEW', 'REQUIRES_REVIEW'], true)
+            && $run->superseded_at === null && $run->superseded_by_user_id === null;
+    }
+
+    public function previewReplacement(): void
+    {
+        $this->authorizeReplacement();
+        $this->clearReplacement();
+        if ($this->displayedRunId === null) {
+            $this->addError('replacement', 'Pilih run aktif sebelum pratinjau revisi.');
+
+            return;
+        }
+        $this->runId = $this->displayedRunId;
+        try {
+            $query = app(ConversionRunQuery::class);
+            $actor = auth()->user();
+            $run = $query->find($actor, $this->caseId, $this->displayedRunId);
+            $case = $query->caseFor($actor, $this->caseId);
+            if (! $this->replacementEligible($case, $run, $query->revisions($actor, $this->caseId)->first()?->id)) {
+                throw ValidationException::withMessages(['expected_predecessor_run_id' => 'Invalid predecessor.']);
+            }
+            $start = $run->requested_start->format('Y-m-d');
+            $end = $run->requested_end->format('Y-m-d');
+            $this->replacementRequestedStart = $start;
+            $this->replacementRequestedEnd = $end;
+            $preview = app(ConversionService::class)->preview($actor, new ConversionPreviewRequest($this->caseId, $start, $end));
+            $status = null;
+            try {
+                $status = app(ConversionSaveability::class)->statusFor($preview)->value;
+            } catch (ValidationException) {
+                // Keep the informative projection without mutation preconditions.
+            }
+            $changed = ! hash_equals($run->dependency_fingerprint, $preview->dependency_fingerprint)
+                || ! hash_equals($run->snapshot_fingerprint, $preview->snapshot_fingerprint);
+            $this->replacementPreviewDisplay = app(ConversionPresenter::class)->previewProjection($preview, $status)
+                + ['has_change' => $changed];
+            if ($status !== null && $changed) {
+                $this->replacementPredecessorRunId = $run->id;
+                $this->replacementExpectedCaseLockVersion = $preview->expected_case_version;
+                $this->replacementExpectedDependencyFingerprint = $preview->dependency_fingerprint;
+                $this->replacementExpectedSnapshotFingerprint = $preview->snapshot_fingerprint;
+            }
+        } catch (ValidationException $error) {
+            $this->clearReplacement(false);
+            $this->replacementValidation($error);
+        } catch (HttpExceptionInterface $error) {
+            $this->clearReplacement();
+            throw $error;
+        } catch (ConversionRuleException) {
+            $this->clearReplacement(false);
+            $this->addError('replacement', 'Aturan belum dapat digunakan. Periksa konteks dan jalankan pratinjau revisi baru.');
+        } catch (Throwable) {
+            $this->clearReplacement(false);
+            $this->addError('replacement', 'Pratinjau revisi tidak dapat dijalankan. Silakan coba kembali secara eksplisit.');
+        }
+    }
+
+    public function replaceConversion(): void
+    {
+        $this->authorizeReplacement();
+        $this->resetErrorBag('replacement');
+        if ($this->replacementPredecessorRunId === null || $this->replacementPredecessorRunId !== $this->displayedRunId
+            || $this->replacementRequestedStart === null || $this->replacementRequestedEnd === null
+            || $this->replacementExpectedCaseLockVersion === null || $this->replacementExpectedDependencyFingerprint === null
+            || $this->replacementExpectedSnapshotFingerprint === null) {
+            $this->clearReplacement(false);
+            $this->addError('replacement', 'Jalankan pratinjau revisi baru pada run yang ditampilkan.');
+
+            return;
+        }
+        $this->runId = $this->displayedRunId;
+        try {
+            $successor = app(ConversionService::class)->replace(auth()->user(), ConversionReplaceRequest::from([
+                'pak_case_id' => $this->caseId,
+                'expected_predecessor_run_id' => $this->replacementPredecessorRunId,
+                'requested_start' => $this->replacementRequestedStart,
+                'requested_end' => $this->replacementRequestedEnd,
+                'expected_case_lock_version' => $this->replacementExpectedCaseLockVersion,
+                'expected_dependency_fingerprint' => $this->replacementExpectedDependencyFingerprint,
+                'expected_snapshot_fingerprint' => $this->replacementExpectedSnapshotFingerprint,
+                'revision_reason' => $this->revisionReason,
+            ]));
+            $this->clearReplacement();
+            $this->clearAssessment();
+            $this->clearPreview();
+            $this->redirect(PakCaseResource::getUrl('conversion', ['record' => $this->caseId, 'run' => $successor->id]));
+        } catch (ValidationException $error) {
+            $this->clearReplacement(false);
+            $this->replacementValidation($error);
+        } catch (HttpExceptionInterface $error) {
+            $this->clearReplacement();
+            throw $error;
+        } catch (ConversionRuleException) {
+            $this->clearReplacement(false);
+            $this->addError('replacement', 'Aturan belum dapat digunakan. Jalankan pratinjau revisi baru setelah pemeriksaan.');
+        } catch (Throwable) {
+            $this->clearReplacement(false);
+            $this->addError('replacement', 'Pembuatan revisi tidak dapat dikonfirmasi. Periksa riwayat konversi tersimpan sebelum tindakan berikutnya.');
+        }
+    }
+
+    private function replacementValidation(ValidationException $error): void
+    {
+        $messages = [
+            'case' => 'Case berubah atau tidak mengizinkan revisi.',
+            'expected_predecessor_run_id' => 'Run sebelumnya berubah atau bukan run aktif terakhir.',
+            'requested_start' => 'Awal rentang harus tetap sama dengan run sebelumnya.',
+            'requested_end' => 'Akhir rentang harus tetap sama dengan run sebelumnya.',
+            'snapshot' => 'Dependensi atau hasil perhitungan berubah.',
+            'replacement' => 'Tidak ada perubahan authoritative yang memerlukan revisi.',
+            'revision_reason' => 'Alasan revisi wajib diisi.',
+            'conversion' => 'Konversi belum dapat diganti.',
+        ];
+        foreach (array_keys($error->errors()) as $field) {
+            $this->addError('replacement', ($messages[$field] ?? 'Revisi belum dapat dibuat.').' Jalankan pratinjau revisi baru.');
+        }
+    }
+
     public function updatedRunId(): void
     {
+        $this->clearReplacement();
         $this->clearAssessment();
         // Do not permit an action in the same request to use the previously displayed run.
         $this->displayedRunId = null;
@@ -92,6 +264,7 @@ class CaseConversion extends Page
 
     public function assessConversion(): void
     {
+        $this->clearReplacement();
         $this->authorizeAssessmentAction();
         $this->clearAssessment();
         if ($this->displayedRunId === null) {
@@ -155,6 +328,7 @@ class CaseConversion extends Page
                 'reason' => $this->reviewReason,
             ]));
             $this->clearAssessment();
+            $this->clearReplacement();
             $this->redirect(PakCaseResource::getUrl('conversion', ['record' => $this->caseId, 'run' => $run->id]));
         } catch (ValidationException $error) {
             $this->clearAssessment(false);
@@ -246,6 +420,7 @@ class CaseConversion extends Page
 
     public function previewConversion(): void
     {
+        $this->clearReplacement();
         $this->clearAssessment();
         abort_unless($this->canCalculate(), 403);
         $this->clearPreview();
@@ -302,6 +477,7 @@ class CaseConversion extends Page
             $run = app(ConversionService::class)->saveInitial(auth()->user(), $request);
             $this->clearPreview();
             $this->clearAssessment();
+            $this->clearReplacement();
             $this->redirect(PakCaseResource::getUrl('conversion', ['record' => $this->caseId, 'run' => $run->id]));
         } catch (ValidationException $error) {
             $this->clearPreview();
@@ -353,18 +529,32 @@ class CaseConversion extends Page
         $run = $selected === null ? null : $query->find($actor, $this->caseId, $selected);
 
         if ($this->displayedRunId !== $run?->id) {
+            $this->clearReplacement();
             $this->clearAssessment();
             $this->displayedRunId = $run?->id;
         }
 
         $canCalculate = $this->canCalculate();
         if (! $canCalculate) {
+            $this->clearReplacement();
             $this->clearPreview();
             $this->clearAssessment();
         }
         $case = $query->caseFor($actor, $this->caseId);
 
+        $comparison = [];
+        if ($run?->predecessor_run_id !== null) {
+            try {
+                $previous = $query->find($actor, $this->caseId, (int) $run->predecessor_run_id);
+                $comparison = app(ConversionPresenter::class)->comparisonProjection($actor, $previous, $run, $url);
+            } catch (ModelNotFoundException) {
+                // A missing/foreign predecessor must never become a comparison candidate.
+            }
+        }
+
         return [
+            'comparison' => $comparison,
+            'canReplace' => $canCalculate && $this->replacementEligible($case, $run, $revisions->first()?->id),
             'canCalculate' => $canCalculate,
             'canInitialSave' => $canCalculate && $revisions->isEmpty() && $case->status === 'DRAFT' && $case->finalized_at === null,
             'caseUrl' => PakCaseResource::getUrl('view', ['record' => $this->caseId]),

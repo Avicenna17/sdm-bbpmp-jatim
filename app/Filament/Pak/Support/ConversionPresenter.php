@@ -15,6 +15,23 @@ use Closure;
 
 final class ConversionPresenter
 {
+    public function comparisonProjection(User $actor, PakConversionRun $previous, PakConversionRun $selected, Closure $url): array
+    {
+        abort_unless(ConversionRunQuery::allows($actor), 403);
+        if ((int) $previous->pak_case_id !== (int) $selected->pak_case_id
+            || (int) $selected->predecessor_run_id !== $previous->id
+            || (int) $selected->revision_number !== (int) $previous->revision_number + 1) {
+            return [];
+        }
+        $sides = [];
+        foreach (['Run sebelumnya' => $previous, 'Run pengganti' => $selected] as $label => $run) {
+            $projection = $this->present($actor, $run, $url);
+            $sides[$label] = array_intersect_key($projection, array_flip(['summary', 'total', 'issues', 'rule', 'periods']));
+        }
+
+        return $sides;
+    }
+
     public function present(User $actor, PakConversionRun $run, Closure $url): array
     {
         abort_unless(ConversionRunQuery::allows($actor), 403);
