@@ -3,6 +3,8 @@
 namespace App\Filament\Pak\Support;
 
 use App\Domain\Pak\Authorization\PakEmployeeAuthorization as Access;
+use App\Domain\Pak\DTOs\ConversionPreview;
+use App\Domain\Pak\DTOs\ConversionPreviewLine;
 use App\Domain\Pak\Queries\ConversionRunQuery;
 use App\Domain\Pak\Services\ConversionRoundingPolicy;
 use App\Models\PakConversionRun;
@@ -48,6 +50,32 @@ final class ConversionPresenter
                     ) : [],
                 ],
             ])->all(),
+        ];
+    }
+
+    public function previewProjection(ConversionPreview $preview, ?string $status): array
+    {
+        return [
+            'start' => $preview->request->requested_start, 'end' => $preview->request->requested_end,
+            'status' => $status, 'exact' => $preview->exact_total === null ? 'Tidak tersedia' : (string) $preview->exact_total,
+            'human' => $preview->human_total ?? 'Tidak tersedia', 'issues' => $this->issues($preview->issues),
+            'lines' => array_map(fn (ConversionPreviewLine $line) => [
+                'months' => $line->months, 'exact' => $line->exact === null ? 'Tidak tersedia' : (string) $line->exact,
+                'human' => $line->human ?? 'Tidak tersedia', 'issues' => $this->issues($line->issues),
+                'source' => $line->source === null ? [] : $this->fields(get_object_vars($line->source), [
+                    'evaluation_id' => 'ID evaluasi', 'performance_year' => 'Tahun', 'predicate_code' => 'Predikat',
+                    'coverage_start' => 'Cakupan formal mulai', 'coverage_end' => 'Cakupan formal akhir',
+                    'source_reference' => 'Referensi sumber', 'source_date' => 'Tanggal sumber', 'selection_reason' => 'Alasan pemilihan',
+                ]),
+                'position' => $line->position === null ? [] : $this->fields(get_object_vars($line->position), [
+                    'history_id' => 'ID histori', 'position_name' => 'Jabatan', 'functional_level_name' => 'Jenjang',
+                    'tmt_start' => 'TMT mulai', 'tmt_end' => 'TMT akhir', 'selection_reason' => 'Bukti kontinuitas',
+                ]),
+                'rule' => array_merge(
+                    $line->predicate === null ? [] : $this->fields(get_object_vars($line->predicate), ['ruleSetId' => 'ID rule set', 'childRuleId' => 'ID aturan predikat', 'predicateFactor' => 'Faktor']),
+                    $line->coefficient === null ? [] : $this->fields(get_object_vars($line->coefficient), ['childRuleId' => 'ID aturan koefisien', 'annualCoefficient' => 'Koefisien tahunan']),
+                ),
+            ], $preview->lines),
         ];
     }
 
