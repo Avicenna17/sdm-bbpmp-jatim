@@ -46,6 +46,31 @@
     @if ($saved === null)
         <p>Belum ada run konversi tersimpan.</p>
     @else
+        @if ($canCalculate)
+            <x-filament::section heading="Asesmen dan tinjauan eksplisit">
+                <p>Asesmen memeriksa perubahan tanpa mengubah perhitungan tersimpan. Tinjauan mencatat hasil pemeriksaan, bukan persetujuan AK.</p>
+                <x-filament::button wire:click="assessConversion" wire:loading.attr="disabled">Periksa perubahan</x-filament::button>
+                @foreach (['assessment', 'review'] as $field)
+                    @error($field)<p role="alert" class="text-danger-600">{{ $message }}</p>@enderror
+                @endforeach
+                @if ($assessmentDisplay !== [])
+                    <p>Hasil asesmen: {{ $assessmentDisplay['comparison'] }}</p>
+                    <p>Revisi {{ $assessmentDisplay['revision'] }} · {{ $assessmentDisplay['status'] }} · {{ $assessmentDisplay['active'] ? 'Run aktif' : 'Run historis' }}</p>
+                    <p>Versi case saat asesmen: {{ $assessmentDisplay['case_version'] }} · Urutan asesmen: {{ $assessmentDisplay['sequence'] }}</p>
+                    @foreach ($assessmentDisplay['changed_groups'] as $group)<p>Kelompok berubah: {{ $group }}</p>@endforeach
+                    @foreach ($assessmentDisplay['issue_codes'] as $code)<p>Issue saat asesmen: {{ $code }}</p>@endforeach
+                    @if ($assessmentDisplay['failure_code'] !== null)<p>Kode kendala asesmen: {{ $assessmentDisplay['failure_code'] }}</p>@endif
+                    @if ($assessedRunId !== null)
+                        <form wire:submit="reviewConversion" class="mt-3 space-y-3">
+                            <label class="block">Alasan tinjauan <textarea wire:model="reviewReason" class="block w-full rounded border-gray-300 dark:bg-gray-900"></textarea></label>
+                            <x-filament::button type="submit" wire:loading.attr="disabled">Catat tinjauan</x-filament::button>
+                        </form>
+                    @else
+                        <p>Asesmen ini tidak menyediakan tindakan tinjauan.</p>
+                    @endif
+                @endif
+            </x-filament::section>
+        @endif
         <x-filament::section heading="Run tersimpan">
             <dl class="grid gap-3 sm:grid-cols-2">
                 @foreach ($saved['summary'] as $label => $value)
@@ -53,6 +78,7 @@
                 @endforeach
             </dl>
             <p>Total eksak: {{ $saved['total']['exact'] }} · Tampilan total: {{ $saved['total']['human'] }}</p>
+            @foreach ($saved['review'] as $label => $value)<p>{{ $label }}: {{ $value }}</p>@endforeach
             @foreach ($saved['rule'] as $label => $value)<p>{{ $label }}: {{ $value }}</p>@endforeach
             @foreach ($saved['issues'] as $issue)
                 <p>@foreach ($issue as $label => $value){{ $label }}: {{ $value }} @endforeach</p>
