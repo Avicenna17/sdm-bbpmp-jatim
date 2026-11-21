@@ -32,6 +32,7 @@ class Phase02AuditPresentationTest extends PakTestCase
         $coefficient = ['pak_rule_set_id' => 1, 'functional_level_id' => 3, 'annual_coefficient' => '25.000000'];
 
         return [
+            'evidence' => ['PAK_CASE_EVIDENCE_UPLOADED', 'PakCase', 'Dokumen pendukung ditambahkan', 'Draf PAK', ['after' => ['case_id' => 1, 'evidence_id' => 2, 'mime_type' => 'application/pdf', 'size_bytes' => 100]], 4],
             'import' => ['SKP_IMPORT_COMMITTED', 'PakSkpImportBatch', 'Impor SKP dikomit', 'Batch impor SKP', [
                 'before' => ['id' => 1, 'status' => 'READY'], 'after' => ['id' => 1, 'status' => 'COMMITTED', 'summary' => ['total' => 1, 'outcomes' => array_replace(array_fill_keys(['PENDING', 'READY', 'IMPORTED', 'DUPLICATE', 'CONFLICT', 'IDENTITY_AMBIGUOUS', 'INVALID', 'FAILED'], 0), ['IMPORTED' => 1])]],
             ], 10],
@@ -61,7 +62,7 @@ class Phase02AuditPresentationTest extends PakTestCase
     public function test_event_allowlists_labels_escaping_and_zero_write(string $code, string $subject, string $label, string $subjectLabel, array $payload, int $changes): void
     {
         $payload['private_path'] = 'PRIVATE-SENTINEL';
-        foreach (['dependency_fingerprint', 'snapshot_fingerprint', 'dependency_manifest', 'snapshot', 'calculation_trace', 'unknown'] as $key) {
+        foreach (['dependency_fingerprint', 'snapshot_fingerprint', 'dependency_manifest', 'snapshot', 'calculation_trace', 'original_filename', 'disk', 'object_key', 'checksum_sha256', 'unknown'] as $key) {
             $payload['after'][$key] = ['secret' => 'PRIVATE-SENTINEL'];
         }
         $event = $this->event($code, $subject, $payload);

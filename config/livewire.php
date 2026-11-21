@@ -3,7 +3,7 @@
 return [
     'temporary_file_upload' => [
         'disk' => 'local',
-        'rules' => ['required', 'file', 'max:15360', 'mimes:xls,xlsx'],
+        'rules' => ['required', 'file', 'max:15360', 'mimes:xls,xlsx,pdf,jpg,jpeg,png'],
         'directory' => 'livewire-tmp',
         'middleware' => 'throttle:30,1',
         'preview_mimes' => [],

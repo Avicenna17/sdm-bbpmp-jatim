@@ -50,6 +50,7 @@ class PakEventResource extends Resource
             'PROFILE_VERIFIED' => 'Profil diverifikasi', 'MASTER_SAVED' => 'Master disimpan',
             'PAK_CASE_CREATED' => 'Draf PAK dibuat', 'PAK_SNAPSHOT_REFRESHED' => 'Snapshot PAK diperbarui',
             'RULE_METADATA_SAVED' => 'Metadata aturan disimpan', 'USER_PERSON_LINKED' => 'Pemetaan pegawai diperbarui',
+            'PAK_CASE_EVIDENCE_UPLOADED' => 'Dokumen pendukung ditambahkan',
             'SKP_IMPORT_COMMITTED' => 'Impor SKP dikomit',
             'PERFORMANCE_EVALUATION_CORRECTED' => 'Evaluasi kinerja dikoreksi',
             'PREDICATE_RULE_CREATED' => 'Aturan predikat dibuat',

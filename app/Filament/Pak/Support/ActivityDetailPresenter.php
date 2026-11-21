@@ -95,6 +95,7 @@ final class ActivityDetailPresenter
         $review = $run + ['assessment_sequence' => 'count'];
 
         return [
+            'PAK_CASE_EVIDENCE_UPLOADED' => ['after' => ['case_id' => 'id', 'evidence_id' => 'id', 'mime_type' => 'evidence_mime', 'size_bytes' => 'evidence_size']],
             'SKP_IMPORT_COMMITTED' => [
                 'before' => ['id' => 'id', 'status' => '=READY'],
                 'after' => ['id' => 'id', 'status' => '=COMMITTED', 'summary' => [
@@ -181,6 +182,8 @@ final class ActivityDetailPresenter
         }
 
         return match ($type) {
+            'evidence_mime' => in_array($value, ['application/pdf', 'image/jpeg', 'image/png'], true),
+            'evidence_size' => is_int($value) && $value > 0 && $value <= 10485760,
             'id' => is_int($value) && $value > 0,
             'count' => is_int($value) && $value >= 0,
             'text' => is_string($value) && trim($value) !== '',
