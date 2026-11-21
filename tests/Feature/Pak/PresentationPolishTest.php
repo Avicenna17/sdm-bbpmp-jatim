@@ -70,7 +70,7 @@ class PresentationPolishTest extends PakTestCase
             ->assertSee('Draf PAK belum merupakan hasil perhitungan atau keputusan kepegawaian.')
             ->assertViewHas('metrics', function ($metrics) {
                 $this->assertSame(['Data Pegawai', 'Draf PAK', 'Perlu Pemeriksaan', 'PAK Ditetapkan'], array_column($metrics, 'label'));
-                $this->assertSame([EmployeeResource::getEloquentQuery()->count(), 1, '—', '—'], array_column($metrics, 'value'));
+                $this->assertSame([EmployeeResource::getEloquentQuery()->count(), 1, 0, '—'], array_column($metrics, 'value'));
 
                 return true;
             });
@@ -79,7 +79,7 @@ class PresentationPolishTest extends PakTestCase
     public function test_authorized_empty_metrics_are_zero(): void
     {
         $this->person->delete();
-        Livewire::test(Dashboard::class)->assertViewHas('metrics', fn ($m) => array_column($m, 'value') === [0, 0, '—', '—']);
+        Livewire::test(Dashboard::class)->assertViewHas('metrics', fn ($m) => array_column($m, 'value') === [0, 0, 0, '—']);
     }
 
     public function test_metrics_without_permissions_do_not_query_protected_counts(): void
@@ -87,7 +87,7 @@ class PresentationPolishTest extends PakTestCase
         $this->actingAs(User::factory()->create()->givePermissionTo('pak.access'));
         DB::enableQueryLog();
         Livewire::test(Dashboard::class)->assertSee('Tidak memiliki akses')->assertViewHas('metrics', fn ($m) => array_column($m, 'value') === ['—', '—', '—', '—']);
-        $counts = collect(DB::getQueryLog())->filter(fn ($q) => str_contains(strtolower($q['query']), 'count(') && preg_match('/people|pak_cases/', $q['query']));
+        $counts = collect(DB::getQueryLog())->filter(fn ($q) => str_contains(strtolower($q['query']), 'count(') && preg_match('/people|pak_cases|pak_conversion_runs/', $q['query']));
         DB::disableQueryLog();
         $this->assertCount(0, $counts);
     }

@@ -31,17 +31,18 @@ class ActivityDetailPresentationTest extends PakTestCase
         }
     }
 
-    public function test_json_is_only_in_closed_optional_details_and_all_values_are_escaped(): void
+    public function test_raw_json_is_removed_and_allowed_values_are_escaped(): void
     {
         $event = PakEvent::create(['actor_id' => $this->manager->id, 'subject_type' => 'User', 'subject_id' => $this->manager->id, 'event_code' => 'ACCOUNT_DEACTIVATED', 'occurred_at' => now(), 'payload' => ['before' => ['is_active' => true], 'after' => ['is_active' => false], 'reason' => '<script>alert("x")</script>']]);
         $count = PakEvent::count();
-        $html = view('filament.pak.audit-detail', ['detail' => app(ActivityDetailPresenter::class)->present($event), 'payload' => $event->payload])->render();
+        $html = view('filament.pak.audit-detail', ['detail' => app(ActivityDetailPresenter::class)->present($event)])->render();
         $this->assertStringNotContainsString('<script>alert', $html);
         $this->assertStringContainsString('&lt;script&gt;', $html);
         $dom = new \DOMDocument;
         @$dom->loadHTML($html);
         $xpath = new \DOMXPath($dom);
-        $this->assertSame(1, $xpath->query('//details[not(@open)]/pre')->length);
+        $this->assertSame(0, $xpath->query('//details | //pre')->length);
+        $this->assertStringNotContainsString('Lihat data teknis', $html);
         $this->assertSame(0, $xpath->query('//pre[not(ancestor::details)]')->length);
         $this->assertSame($count, PakEvent::count());
     }
@@ -51,13 +52,14 @@ class ActivityDetailPresentationTest extends PakTestCase
         $event = new PakEvent(['subject_type' => 'UnknownType', 'subject_id' => 47, 'event_code' => 'UNKNOWN_EVENT', 'occurred_at' => now(), 'payload' => ['after' => ['is_active' => null, 'name' => 'Nama Baru'], 'reason' => null]]);
         $detail = app(ActivityDetailPresenter::class)->present($event);
         $this->assertSame('UNKNOWN_EVENT', $detail['activity']);
-        $this->assertSame('UnknownType #47', $detail['object']);
-        $this->assertSame('Tidak tercatat', $detail['changes'][0]['before']);
-        $this->assertSame('—', $detail['changes'][0]['after']);
+        $this->assertSame('Objek audit #47', $detail['object']);
+        $this->assertSame([], $detail['changes']);
         $this->assertSame('—', $detail['reason']);
-        $event->payload = ['before' => ['case' => ['name' => 'Lama', 'status' => 'DRAFT']], 'after' => ['case' => ['name' => 'Baru', 'status' => 'DRAFT']]];
-        $detail = app(ActivityDetailPresenter::class)->present($event);
-        $this->assertSame([['label' => 'Draf PAK / Nama', 'before' => 'Lama', 'after' => 'Baru']], $detail['changes']);
+        $event->payload = ['before' => ['case' => ['name' => 'Lama']], 'after' => ['case' => ['name' => 'Baru']]];
+        $this->assertSame([], app(ActivityDetailPresenter::class)->present($event)['changes']);
+        $event->event_code = 'MASTER_SAVED';
+        $event->payload = ['after' => ['name' => null, 'private' => ['value' => 'NEVER-EXPOSE']]];
+        $this->assertSame([['label' => 'Nama', 'before' => 'Tidak tercatat', 'after' => '—']], app(ActivityDetailPresenter::class)->present($event)['changes']);
         $event->payload = null;
         $this->assertSame([], app(ActivityDetailPresenter::class)->present($event)['changes']);
     }

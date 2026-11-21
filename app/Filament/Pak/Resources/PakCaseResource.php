@@ -4,6 +4,7 @@ namespace App\Filament\Pak\Resources;
 
 use App\Domain\Pak\Authorization\PakEmployeeAuthorization as Access;
 use App\Domain\Pak\Enums\PakPurposeType;
+use App\Domain\Pak\Queries\ConversionReviewQuery;
 use App\Domain\Pak\Queries\EmployeeReferenceQuery;
 use App\Filament\Pak\Support\EmployeeForms;
 use App\Models\PakCase;
@@ -21,6 +22,7 @@ use Filament\Resources\Resource;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -112,6 +114,10 @@ class PakCaseResource extends Resource
             TextColumn::make('id')->label('ID draft'), TextColumn::make('employeeSnapshot.name')->label('Nama saat snapshot')->searchable(),
             TextColumn::make('purpose_type')->label('Tujuan')->badge(), TextColumn::make('period_start')->label('Awal')->date(),
             TextColumn::make('period_end')->label('Akhir')->date(), TextColumn::make('status')->badge(),
+        ])->filters([
+            Filter::make('needs_review')->label('Perlu Pemeriksaan')
+                ->query(fn (Builder $query) => $query->whereIn('pak_cases.id',
+                    app(ConversionReviewQuery::class)->forManager(auth()->user())->select('pak_case_id'))),
         ])->actions([ViewAction::make()->url(fn (PakCase $record) => static::getUrl('view', ['record' => $record])), EditAction::make()->url(fn (PakCase $record) => static::getUrl('edit', ['record' => $record]))]);
     }
 

@@ -15,13 +15,9 @@
         .pak-change-arrow{display:none;color:#92929b;align-self:center;text-align:center}
         .pak-change-narrative{display:flex;align-items:flex-start;gap:.65rem;margin:1.5rem 0}
         .pak-change-narrative svg{flex-shrink:0;margin-top:.2rem}
-        .pak-activity-technical{border-top:1px solid #e4e4e7;padding-top:1rem;font-size:.875rem}
-        .pak-activity-technical summary{cursor:pointer;color:#62626b}
-        .pak-activity-technical summary:focus-visible{outline:2px solid #059669;outline-offset:3px}
-        .pak-activity-technical pre{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:.75rem;font-size:.75rem}
         @media(min-width:640px){.pak-activity-meta{grid-template-columns:repeat(2,minmax(0,1fr))}.pak-change-values{grid-template-columns:1fr 2rem 1fr}.pak-change-arrow{display:block}}
-        .dark .pak-activity-detail dt,.dark .pak-change-label,.dark .pak-change-column>span,.dark .pak-activity-description,.dark .pak-activity-technical summary{color:#a1a1aa}
-        .dark .pak-activity-meta,.dark .pak-change-card,.dark .pak-change-row,.dark .pak-change-reason,.dark .pak-activity-technical{border-color:#3f3f46}
+        .dark .pak-activity-detail dt,.dark .pak-change-label,.dark .pak-change-column>span,.dark .pak-activity-description{color:#a1a1aa}
+        .dark .pak-activity-meta,.dark .pak-change-card,.dark .pak-change-row,.dark .pak-change-reason{border-color:#3f3f46}
     </style>
     <dl class="pak-activity-meta">
         <div><dt>Waktu Aktivitas</dt><dd>{{ $detail['time'] }}</dd></div>
@@ -42,13 +38,10 @@
                 </div>
             </div>
         @empty
-            <p class="pak-change-row">Tidak ada rincian perubahan sebelum/sesudah yang tercatat.</p>
+            <p class="pak-change-row">Rincian perubahan tidak tersedia atau tidak ada perubahan yang dapat ditampilkan.</p>
         @endforelse
         <div class="pak-change-reason"><p class="pak-change-label">Alasan Perubahan</p><p>{{ $detail['reason'] }}</p></div>
     </div>
     <p class="pak-change-narrative"><x-filament::icon icon="heroicon-o-information-circle" class="h-5 w-5" aria-hidden="true" /><span>{{ $detail['narrative'] }}</span></p>
-    <details class="pak-activity-technical">
-        <summary>Lihat data teknis</summary>
-        <pre>{{ json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
-    </details>
+
 </div>

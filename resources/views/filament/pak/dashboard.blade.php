@@ -22,6 +22,9 @@
                     <x-filament::icon :icon="['heroicon-o-users', 'heroicon-o-pencil-square', 'heroicon-o-clipboard-document-check', 'heroicon-o-document-check'][$loop->index]" class="h-5 w-5" aria-hidden="true" />
                 </div>
                 <p class="pak-summary-value">{{ $metric['value'] }}</p>
+                @if ($metric['url'] ?? null)
+                    <a href="{{ $metric['url'] }}" class="text-primary-600 underline">Lihat kasus yang perlu pemeriksaan</a>
+                @endif
                 <p class="pak-summary-description">{{ $metric['description'] }}</p>
             </section>
         @endforeach

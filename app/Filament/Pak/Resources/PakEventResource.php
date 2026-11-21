@@ -35,6 +35,13 @@ class PakEventResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clock';
 
+    public static function getEloquentQuery(): Builder
+    {
+        abort_unless(static::canViewAny(), 403);
+
+        return parent::getEloquentQuery()->with('actor');
+    }
+
     public static function activityLabel(string $code): string
     {
         return match ($code) {
@@ -43,6 +50,16 @@ class PakEventResource extends Resource
             'PROFILE_VERIFIED' => 'Profil diverifikasi', 'MASTER_SAVED' => 'Master disimpan',
             'PAK_CASE_CREATED' => 'Draf PAK dibuat', 'PAK_SNAPSHOT_REFRESHED' => 'Snapshot PAK diperbarui',
             'RULE_METADATA_SAVED' => 'Metadata aturan disimpan', 'USER_PERSON_LINKED' => 'Pemetaan pegawai diperbarui',
+            'SKP_IMPORT_COMMITTED' => 'Impor SKP dikomit',
+            'PERFORMANCE_EVALUATION_CORRECTED' => 'Evaluasi kinerja dikoreksi',
+            'PREDICATE_RULE_CREATED' => 'Aturan predikat dibuat',
+            'PREDICATE_RULE_UPDATED' => 'Aturan predikat diperbarui',
+            'COEFFICIENT_RULE_CREATED' => 'Aturan koefisien dibuat',
+            'COEFFICIENT_RULE_UPDATED' => 'Aturan koefisien diperbarui',
+            'RULE_SET_COPIED' => 'Versi aturan disalin',
+            'CONVERSION_RUN_SAVED' => 'Konversi disimpan',
+            'CONVERSION_RUN_REVIEW_ASSESSED' => 'Tinjauan konversi dicatat',
+            'CONVERSION_RUN_REPLACED' => 'Revisi konversi dibuat',
             default => $code,
         };
     }
@@ -54,7 +71,11 @@ class PakEventResource extends Resource
             'EmployeePositionHistory' => 'Histori jabatan', 'FunctionalCategory' => 'Kategori JF',
             'FunctionalLevel' => 'Jenjang JF', 'FunctionalPosition' => 'Jabatan fungsional',
             'FunctionalPositionLevel' => 'Pemetaan jabatan dan jenjang', 'PakRuleSet' => 'Aturan PAK',
-            'PakCase' => 'Draf PAK', default => $record->subject_type,
+            'PakCase' => 'Draf PAK',
+            'PakConversionRun' => 'Run konversi', 'PakSkpImportBatch' => 'Batch impor SKP',
+            'PerformanceEvaluation' => 'Evaluasi kinerja', 'PerformancePredicateRule' => 'Aturan predikat',
+            'AkCoefficientRule' => 'Aturan koefisien',
+            default => 'Objek audit',
         };
 
         return $type.' #'.$record->subject_id;
@@ -106,7 +127,7 @@ class PakEventResource extends Resource
                 }),
             ])->deferFilters()
             ->actions([Action::make('detail')->label('Detail')->authorize('view')->modalHeading('Detail Aktivitas')->modalCancelActionLabel('Tutup')->modalWidth('3xl')->modalSubmitAction(false)
-                ->modalContent(fn (PakEvent $record) => view('filament.pak.audit-detail', ['detail' => app(ActivityDetailPresenter::class)->present($record), 'payload' => $record->payload]))]);
+                ->modalContent(fn (PakEvent $record) => view('filament.pak.audit-detail', ['detail' => app(ActivityDetailPresenter::class)->present($record)]))]);
     }
 
     public static function getPages(): array

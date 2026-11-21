@@ -4,7 +4,6 @@ namespace App\Filament\Pak\Support;
 
 use App\Filament\Pak\Resources\PakEventResource;
 use App\Models\PakEvent;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 /** Read-only presentation of recorded values; never infers a missing historical value. */
@@ -12,9 +11,9 @@ final class ActivityDetailPresenter
 {
     public function present(PakEvent $event): array
     {
-        $payload = $event->payload ?? [];
-        $before = $this->flatten($payload['before'] ?? []);
-        $after = $this->flatten($payload['after'] ?? []);
+        $payload = $this->projectPayload($event->event_code, $event->payload);
+        $before = $payload['before'] ?? [];
+        $after = $payload['after'] ?? [];
         $changes = [];
         foreach (array_unique([...array_keys($before), ...array_keys($after)]) as $key) {
             $hasBefore = array_key_exists($key, $before);
@@ -52,9 +51,193 @@ final class ActivityDetailPresenter
         ];
     }
 
-    private function flatten(mixed $data): array
+    /** Unknown keys are ignored; malformed allowed values invalidate the whole detail. */
+    private function projectPayload(string $code, mixed $payload): array
     {
-        return is_array($data) ? Arr::dot($data) : (is_null($data) ? [] : ['value' => $data]);
+        if (! is_array($payload)) {
+            return [];
+        }
+        $schemas = $this->schemas();
+        if (! isset($schemas[$code])) {
+            return $this->legacyPayload($code, $payload);
+        }
+        $result = [];
+        foreach ($schemas[$code] as $section => $schema) {
+            if (is_array($schema)) {
+                if (! isset($payload[$section]) || ! is_array($payload[$section])) {
+                    return [];
+                }
+                $values = $this->fields($payload[$section], $schema);
+                if ($values === null) {
+                    return [];
+                }
+                $result[$section] = $values;
+            } else {
+                if (! array_key_exists($section, $payload) || ! $this->valid($payload[$section], $schema)) {
+                    return [];
+                }
+                if ($section === 'reason') {
+                    $result['reason'] = $payload[$section];
+                } else {
+                    $result['after'][$section] = $payload[$section];
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    private function schemas(): array
+    {
+        $run = ['case_id' => 'id', 'run_id' => 'id', 'revision_number' => 'id', 'status' => 'run'];
+        $predicate = ['pak_rule_set_id' => 'id', 'predicate_code' => 'code', 'predicate_name' => 'text', 'predicate_factor' => 'decimal'];
+        $coefficient = ['pak_rule_set_id' => 'id', 'functional_level_id' => 'id', 'annual_coefficient' => 'decimal'];
+        $review = $run + ['assessment_sequence' => 'count'];
+
+        return [
+            'SKP_IMPORT_COMMITTED' => [
+                'before' => ['id' => 'id', 'status' => '=READY'],
+                'after' => ['id' => 'id', 'status' => '=COMMITTED', 'summary' => [
+                    'total' => 'count', 'outcomes' => array_fill_keys(['PENDING', 'READY', 'IMPORTED', 'DUPLICATE', 'CONFLICT', 'IDENTITY_AMBIGUOUS', 'INVALID', 'FAILED'], 'count'),
+                ]],
+            ],
+            'PERFORMANCE_EVALUATION_CORRECTED' => [
+                'before' => ['id' => 'id', 'status' => '=CURRENT'],
+                'after' => ['id' => 'id', 'status' => '=CURRENT', 'source_row_id' => 'id'],
+                'reason' => 'text', 'supersedes_id' => 'id',
+            ],
+            'PREDICATE_RULE_CREATED' => ['after' => $predicate],
+            'PREDICATE_RULE_UPDATED' => ['before' => $predicate, 'after' => $predicate],
+            'COEFFICIENT_RULE_CREATED' => ['after' => $coefficient],
+            'COEFFICIENT_RULE_UPDATED' => ['before' => $coefficient, 'after' => $coefficient],
+            'RULE_SET_COPIED' => ['after' => [
+                'source_rule_set_id' => 'id', 'target_rule_set_id' => 'id', 'code' => 'text', 'version' => 'text',
+                'status' => '=DRAFT', 'predicate_count' => 'count', 'coefficient_count' => 'count',
+            ]],
+            'CONVERSION_RUN_SAVED' => ['after' => $run + ['issue_codes' => 'codes']],
+            'CONVERSION_RUN_REVIEW_ASSESSED' => [
+                'before' => $review + ['comparison?' => 'comparison'],
+                'after' => array_replace($review, ['status' => '=REQUIRES_REVIEW']) + [
+                    'comparison' => 'comparison', 'changed_groups' => 'groups', 'current_issue_codes' => 'codes', 'failure_code?' => 'code',
+                ],
+                'reason' => 'text',
+            ],
+            'CONVERSION_RUN_REPLACED' => [
+                'before' => ['run_id' => 'id', 'revision_number' => 'id', 'status' => 'run'],
+                'after' => $run + ['issue_codes' => 'codes'], 'reason' => 'text', 'supersedes_id' => 'id',
+            ],
+        ];
+    }
+
+    private function fields(array $data, array $schema, string $prefix = ''): ?array
+    {
+        $result = [];
+        foreach ($schema as $field => $type) {
+            $optional = str_ends_with($field, '?');
+            $field = rtrim($field, '?');
+            if (! array_key_exists($field, $data)) {
+                if ($optional) {
+                    continue;
+                }
+
+                return null;
+            }
+            $value = $data[$field];
+            $path = $prefix.$field;
+            if (is_array($type)) {
+                if (! is_array($value) || ($nested = $this->fields($value, $type, $path.'.')) === null) {
+                    return null;
+                }
+                $result += $nested;
+            } else {
+                if (! $this->valid($value, $type)) {
+                    return null;
+                }
+                $result[$path] = is_array($value) ? ($value === [] ? 'Tidak ada' : implode(', ', $value)) : $value;
+            }
+        }
+
+        return $result;
+    }
+
+    private function valid(mixed $value, string $type): bool
+    {
+        if (str_starts_with($type, '=')) {
+            return $value === substr($type, 1);
+        }
+        if (in_array($type, ['codes', 'groups'], true)) {
+            if (! is_array($value) || ! array_is_list($value) || count($value) > 100) {
+                return false;
+            }
+            foreach ($value as $item) {
+                if ($type === 'groups'
+                    ? ! in_array($item, ['case_context', 'coverage', 'source_candidates', 'selected_sources', 'position_assignments', 'history_dependencies', 'rule_set', 'versions'], true)
+                    : ! $this->valid($item, 'code')) {
+                    return false;
+                }
+            }
+
+            return count(array_unique($value)) === count($value);
+        }
+
+        return match ($type) {
+            'id' => is_int($value) && $value > 0,
+            'count' => is_int($value) && $value >= 0,
+            'text' => is_string($value) && trim($value) !== '',
+            'code' => is_string($value) && preg_match('/\A[A-Z][A-Z0-9_]{0,99}\z/D', $value) === 1,
+            'decimal' => is_string($value) && preg_match('/\A[0-9]+(?:\.[0-9]+)?\z/D', $value) === 1,
+            'run' => in_array($value, ['PREVIEW', 'REQUIRES_REVIEW'], true),
+            'comparison' => in_array($value, ['UNCHANGED', 'CHANGED', 'UNASSESSABLE'], true),
+            default => false,
+        };
+    }
+
+    private function legacyPayload(string $code, array $payload): array
+    {
+        $fields = match ($code) {
+            'ACCOUNT_DEACTIVATED', 'ACCOUNT_REACTIVATED' => ['is_active'],
+            'USER_PERSON_LINKED' => ['person_id'],
+            'PROFILE_VERIFIED' => ['person_id', 'institution_name', 'work_unit_name'],
+            'HISTORY_VERIFIED', 'HISTORY_CORRECTED' => ['person_id', 'rank_name', 'grade_code', 'position_name', 'position_type', 'functional_position_id', 'functional_level_id', 'tmt', 'valid_from', 'valid_until', 'sk_number', 'sk_date'],
+            'MASTER_SAVED' => ['code', 'name', 'is_active', 'functional_category_id', 'functional_position_id', 'functional_level_id'],
+            'RULE_METADATA_SAVED' => ['code', 'name', 'version', 'status', 'valid_from', 'valid_until'],
+            'PAK_CASE_CREATED', 'PAK_SNAPSHOT_REFRESHED' => ['person_id', 'pak_rule_set_id', 'purpose_type', 'status', 'period_start', 'period_end', 'employee_data_as_of', 'lock_version'],
+            default => [],
+        };
+        if ($fields === []) {
+            return [];
+        }
+        $result = [];
+        foreach (['before', 'after'] as $side) {
+            $data = $payload[$side] ?? [];
+            if (! is_array($data)) {
+                return [];
+            }
+            $prefix = '';
+            if ($code === 'PAK_SNAPSHOT_REFRESHED') {
+                $data = $data['case'] ?? [];
+                if (! is_array($data)) {
+                    return [];
+                }
+                $prefix = 'case.';
+            }
+            foreach ($fields as $field) {
+                if (! array_key_exists($field, $data)) {
+                    continue;
+                }
+                $value = $data[$field];
+                if (! is_null($value) && ! is_string($value) && ! is_int($value) && ! is_bool($value)) {
+                    return [];
+                }
+                $result[$side][$prefix.$field] = $value;
+            }
+        }
+        if (isset($payload['reason']) && ! is_string($payload['reason'])) {
+            return [];
+        }
+        $result['reason'] = $payload['reason'] ?? null;
+
+        return $result;
     }
 
     private function label(string $path): string
@@ -92,7 +275,7 @@ final class ActivityDetailPresenter
             return $value ? 'Ya' : 'Tidak';
         }
         if (is_array($value)) {
-            return $value === [] ? 'Tidak ada data' : 'Lihat data teknis';
+            return 'Tidak tersedia';
         }
 
         return (string) $value;
