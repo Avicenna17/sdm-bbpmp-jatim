@@ -40,6 +40,12 @@ Acceptance D1: authorized persisted preparation/commit/history menggunakan backe
 
 ## 5. 02D.2 — Private evidence dan design gate
 
+**Checkpoint desain D2 setelah baseline `472e40d`:** [dedicated private-evidence design freeze](phase-02d2-private-evidence-design.md) menetapkan **02D.2 DESIGN FROZEN FOR IMPLEMENTATION — berlaku setelah commit dokumentasi design/freeze ini**. PRE-IMPLEMENTATION DESIGN GATE di bawah terpenuhi hanya setelah commit tersebut. Wording belum-approved pada checkpoint plan awal di bawah dipertahankan sebagai provenance, bukan pembatalan approval bounded dalam freeze baru.
+
+Freeze tersebut secara eksplisit menyetujui `PakCaseEvidence` / `pak_case_evidences`, case-owned append-only evidence tanpa evaluation linkage/replacement/delete, private `local`, PDF/JPEG/PNG 10 MiB dan SHA-256, bounded Livewire transport expansion, authenticated case-scoped download, serta `PAK_CASE_EVIDENCE_UPLOADED` dengan bounded D4 presentation extension. Read/list/download memakai active actor + `pak.access` + `pak.case.view` + `pak.skp.view`; upload menambah `pak.case.update` dan `pak.skp.manage`, **tanpa `pak.employee.view` atau `pak.conversion.view`**. Detail authoritative, scope approval, compensation, dan tests berada pada dokumen khusus tersebut.
+
+Approval schema/model/config terbatas pada kontrak D2 itu; tidak ada implementasi dalam checkpoint dokumentasi ini. D2 belum FINAL, D3/D4 tetap FINAL/FROZEN, dan Phase 02E belum dimulai.
+
 **Import workbook provenance berbeda dari evaluation/document evidence attachment.** `SkpSourceStorage` dan batch provenance bukan general attachment representation. Baseline belum menyediakan accepted dedicated evidence attachment representation.
 
 **PRE-IMPLEMENTATION DESIGN GATE:** freeze terpisah harus menetapkan attachment ownership/linkage, hubungan evaluation revision, immutability, allowed MIME, maximum size, checksum, private object storage, authorized upload/download, replacement/version behavior, failure compensation, orphan cleanup, safe audit metadata, dan retention. Jangan menganggap versi evaluasi baru otomatis memindahkan/menghapus evidence lama.
