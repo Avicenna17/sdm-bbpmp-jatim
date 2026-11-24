@@ -185,3 +185,26 @@ Tidak menjalankan full Phase 02E saat implementasi D2. Whole-phase regression, c
 Tetap deferred: retention/purge lanjutan, evidence replacement/version chain, deletion/removal, evaluation-specific linkage, download audit logging, orphan reconciliation job/tooling, employee self-service evidence, public/inline preview. Tidak boleh diimplementasikan diam-diam.
 
 Implementasi D2 baru dapat diterima setelah kontrak di atas diimplementasikan, focused tests/regressions dan quality/scope checks lulus. **Design freeze bukan D2 FINAL**, bukan UAT/deployment verification, dan bukan dimulainya Phase 02E.
+
+## Formal implementation acceptance — 24 November 2026
+
+**Status: FINAL / FROZEN.**
+
+Implementation Phase 02D.2 Private Evidence telah diterima terhadap frozen design contract dengan accepted implementation baseline `6957ea1` (`feat: add private case evidence UI`).
+
+Acceptance evidence:
+
+- Focused private-evidence regression: 83 tests passed / 593 assertions.
+- Bounded compatibility regression: 21 tests passed / 96 assertions.
+- Evidence storage, lifecycle, download, UI, authorization, audit presentation, integrity verification, compensation behavior, and transport compatibility passed.
+- XLS/XLSX transport remains available while D2 evidence acceptance remains restricted to PDF/JPEG/PNG and maximum 10 MiB.
+- Bounded read-only search for evidence delete/destroy implementation returned no matches.
+- Repository remained clean after acceptance execution.
+
+Accepted implementation preserves the frozen contract: case-owned evidence, append-only lifecycle, private `local` storage, server-generated random object key, SHA-256/read-back verification, exact authorization, DRAFT-only upload, authorized read/download, immutable persisted evidence, bounded audit payload, and no edit/replace/delete/public-preview workflow.
+
+No corrective implementation is required by this acceptance checkpoint.
+
+Deferred items from the frozen design remain deferred and are not implicitly authorized by this acceptance.
+
+Phase 02D.2 is therefore **FINAL / FROZEN**. This checkpoint alone does not declare overall Phase 02D closed and does not start Phase 02E.

@@ -223,4 +223,19 @@ Checkpoint ini documentation-only; tidak mengubah source/tests/routes/schema/per
 - Disetujui satu event **`PAK_CASE_EVIDENCE_UPLOADED`**, subject `PakCase`, payload `after` hanya case_id/evidence_id/mime_type/size_bytes. Tanpa filename/disk/key/checksum/path. Download event tidak wajib; replace/delete events tidak dibuat. Safe label/allowlist/test D4 boleh diperluas secara bounded untuk event ini saja; bukan reopening D4 lifecycle atau audit writer semantics.
 - UI pada existing ViewCase, **Dokumen pendukung kasus**; tanpa top-level resource atau perubahan CaseConversion. Frozen implementation/test scope dan deferred items mengikuti dedicated design. Evaluation linkage, download logging, replacement/deletion, employee portal dan public/inline preview tetap di luar minimal D2.
 
-Ini documentation-only approval desain, bukan acceptance implementasi; **D2 belum FINAL dan Phase 02E belum dimulai**. Tidak mengubah unrelated decisions, business-rule status, conversion/SKP semantics, permission/seeders/Composer, atau filesystem disk configuration. Tidak ada klaim UAT/deployment verification.
+Pada checkpoint design freeze ini, approval bersifat documentation-only dan pada saat itu belum merupakan acceptance implementasi; **D2 belum FINAL dan Phase 02E belum dimulai**. Tidak mengubah unrelated decisions, business-rule status, conversion/SKP semantics, permission/seeders/Composer, atau filesystem disk configuration. Tidak ada klaim UAT/deployment verification.
+
+
+# Phase 02D.2 — Private evidence implementation acceptance
+
+**Status: FINAL / FROZEN — 24 November 2026.**
+
+Implementation baseline `6957ea1` telah diterima terhadap frozen Phase 02D.2 design contract.
+
+Focused acceptance menghasilkan 83 passed / 593 assertions. Bounded compatibility regression menghasilkan tambahan 21 passed / 96 assertions. Storage/private-integrity, authorization, immutable lifecycle, verified download, UI, audit presentation, XLS/XLSX transport compatibility, dan failure/compensation boundaries lulus tanpa corrective implementation.
+
+Bounded read-only search tidak menemukan evidence delete/destroy implementation. Working tree tetap clean setelah acceptance.
+
+02D.2 dinyatakan **FINAL / FROZEN**. Deferred design items tetap deferred. Checkpoint ini tidak menutup keseluruhan Phase 02D dan tidak memulai Phase 02E.
+
+Detail acceptance berada pada `plans/phase-02d2-private-evidence-design.md`.
