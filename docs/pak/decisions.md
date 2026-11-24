@@ -195,6 +195,19 @@ Checkpoint setelah formal closure 02C `edfd875` (technical acceptance `de40fef`)
 
 Checkpoint ini documentation-only; tidak mengubah source/tests/routes/schema/permissions atau accepted backend semantics.
 
+# Phase 02D.1 — Production client adapter acceptance
+
+**Status: BLOCKED / DEFERRED.** Keputusan ini merupakan hasil acceptance audit production client adapter setelah verifikasi representative workbook Evaluasi Akhir SKP tahun 2024 dan 2025. Detail evidence dan reopen condition dicatat pada [D1 Production Client Adapter Acceptance](d1-production-adapter-acceptance.md).
+
+- Official Excel export tahun 2024 dan 2025 konsisten membawa tujuh field: No, NIP, Nama, Jabatan, Durasi Jabatan, Status, dan Predikat Kinerja. Stable evaluation record identifier tidak tersedia pada workbook, hidden structure, defined names, connections, properties, links, comments/notes, atau formula yang telah diaudit.
+- Source application terbukti mempunyai stable evaluation record identifier yang digunakan oleh action `dialog_print_eval(<ID>)` dan `dialog_print_dok_eval(<ID>)`. Identifier pada record yang sama tetap identik setelah reload, navigasi, dan logout/login; record evaluasi berbeda milik pegawai yang sama mempunyai identifier berbeda.
+- Dengan demikian, stable identifier tersedia pada source application tetapi tidak disertakan dalam official Excel export yang menjadi input workbook.
+- Production workbook adapter tidak boleh mensintesis `source_record_identifier` dari Excel row/order, NIP, nama, kombinasi business fields, filename, batch/import order, generated UUID, predicate, atau content hash.
+- Tidak dilakukan scraping UI atau integrasi endpoint/API yang belum menjadi interface resmi dan terdukung. Existing `SkpSourceAdapter`, DTO, normalization, fingerprint, matching, preparation, commit, serta synthetic test foundation tidak diubah.
+- Production workbook adapter acceptance dinyatakan **BLOCKED** dan implementation **HOLD / DEFERRED**. Ini merupakan external input contract blocker, bukan defect pada existing Phase 02A.2 foundation.
+- D1/02D.1 adapter gate hanya dibuka kembali jika tersedia official export dengan stable evaluation identifier, tersedia API/layanan data resmi dan terdukung yang menyediakan identifier tersebut, atau terdapat approved architecture/domain decision yang secara eksplisit mengubah existing identity contract.
+- Delivery Phase 02 lain yang tidak bergantung pada production client adapter tetap dapat dilanjutkan sesuai gate dan scope masing-masing.
+
 # Phase 02D.2 — Private evidence design freeze
 
 **02D.2 DESIGN FROZEN FOR IMPLEMENTATION — berlaku setelah commit dokumentasi design/freeze ini.** Baseline `472e40d`, setelah 02D.3 dan 02D.4 FINAL/FROZEN. [Kontrak D2 authoritative](plans/phase-02d2-private-evidence-design.md) memenuhi PRE-IMPLEMENTATION DESIGN GATE setelah commit dokumentasi ini. Checkpoint plan awal yang belum mengotorisasi schema/model tetap merupakan historical provenance; approval berikut adalah keputusan eksplisit baru dan bounded.
