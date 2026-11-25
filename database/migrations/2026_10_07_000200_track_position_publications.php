@@ -13,10 +13,29 @@ return new class extends Migration
             $table->timestamp('published_at')->nullable()->index();
         });
         // Recover only versions whose remaining snapshots were actually public.
-        $legacy = DB::table('import_batches as b')->join('reporting_periods as p', 'p.id', '=', 'b.reporting_period_id')
-            ->where('b.source_type', 'POSITION_REQUIREMENT')->where('b.status', 'committed')->where('p.status', 'published')
-            ->whereExists(fn ($q) => $q->selectRaw('1')->from('position_requirement_snapshots as s')->whereColumn('s.import_batch_id', 'b.id'))
-            ->get(['b.id', 'b.committed_at', 'p.published_at']);
+        $legacy = DB::table('import_batches')
+            ->join(
+                'reporting_periods',
+                'reporting_periods.id',
+                '=',
+                'import_batches.reporting_period_id'
+            )
+            ->where('import_batches.source_type', 'POSITION_REQUIREMENT')
+            ->where('import_batches.status', 'committed')
+            ->where('reporting_periods.status', 'published')
+            ->whereExists(
+                fn($q) => $q->selectRaw('1')
+                    ->from('position_requirement_snapshots')
+                    ->whereColumn(
+                        'position_requirement_snapshots.import_batch_id',
+                        'import_batches.id'
+                    )
+            )
+            ->get([
+                'import_batches.id',
+                'import_batches.committed_at',
+                'reporting_periods.published_at',
+            ]);
         foreach ($legacy as $batch) {
             DB::table('import_batches')->where('id', $batch->id)->update(['published_at' => $batch->published_at ?? $batch->committed_at ?? now()]);
         }
@@ -28,6 +47,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('import_batches', fn (Blueprint $table) => $table->dropColumn('published_at'));
+        Schema::table('import_batches', fn(Blueprint $table) => $table->dropColumn('published_at'));
     }
 };

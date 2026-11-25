@@ -9,7 +9,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $t) {
-            $t->foreignId('person_id')->nullable()->constrained('people')->restrictOnDelete();
+            $t->foreignId('person_id')
+                ->nullable()
+                ->constrained('people')
+                ->restrictOnDelete();
+
             $t->unique('person_id');
         });
     }
@@ -17,8 +21,15 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $t) {
+            $t->dropForeign(['person_id']);
+        });
+
+        Schema::table('users', function (Blueprint $t) {
             $t->dropUnique(['person_id']);
-            $t->dropConstrainedForeignId('person_id');
+        });
+
+        Schema::table('users', function (Blueprint $t) {
+            $t->dropColumn('person_id');
         });
     }
 };

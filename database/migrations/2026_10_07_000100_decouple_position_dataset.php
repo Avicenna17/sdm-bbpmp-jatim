@@ -30,18 +30,47 @@ return new class extends Migration
             $table->timestamps();
         });
         // Keep all legacy snapshots and import paths intact for audit/revalidation.
-        $legacy = DB::table('import_batches as b')
-            ->join('reporting_periods as p', 'p.id', '=', 'b.reporting_period_id')
-            ->where('b.source_type', 'POSITION_REQUIREMENT')->where('b.status', 'committed')
-            ->whereExists(fn ($q) => $q->selectRaw('1')->from('position_requirement_snapshots as s')->whereColumn('s.import_batch_id', 'b.id'))
-            ->orderByDesc('p.period_month')->orderByDesc('b.id');
-        $published = (clone $legacy)->where('p.status', 'published')->first(['b.id', 'p.published_at', 'p.published_by']);
-        $draft = (clone $legacy)->value('b.id');
-        DB::table('position_datasets')->insert(['id' => 1, 'draft_batch_id' => $draft, 'published_batch_id' => $published?->id,
-            'revision' => 0, 'published_at' => $published?->published_at, 'published_by' => $published?->published_by,
-            'created_at' => now(), 'updated_at' => now()]);
+        $legacy = DB::table('import_batches')
+            ->join(
+                'reporting_periods',
+                'reporting_periods.id',
+                '=',
+                'import_batches.reporting_period_id'
+            )
+            ->where('import_batches.source_type', 'POSITION_REQUIREMENT')
+            ->where('import_batches.status', 'committed')
+            ->whereExists(
+                fn($q) => $q->selectRaw('1')
+                    ->from('position_requirement_snapshots')
+                    ->whereColumn(
+                        'position_requirement_snapshots.import_batch_id',
+                        'import_batches.id'
+                    )
+            )
+            ->orderByDesc('reporting_periods.period_month')
+            ->orderByDesc('import_batches.id');
+
+        $published = (clone $legacy)
+            ->where('reporting_periods.status', 'published')
+            ->first([
+                'import_batches.id',
+                'reporting_periods.published_at',
+                'reporting_periods.published_by',
+            ]);
+
+        $draft = (clone $legacy)->value('import_batches.id');
+        DB::table('position_datasets')->insert([
+            'id' => 1,
+            'draft_batch_id' => $draft,
+            'published_batch_id' => $published?->id,
+            'revision' => 0,
+            'published_at' => $published?->published_at,
+            'published_by' => $published?->published_by,
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
         DB::table('reporting_periods')->where('status', '!=', 'published')
-            ->whereExists(fn ($q) => $q->selectRaw('1')->from('personnel_snapshots')->whereColumn('reporting_period_id', 'reporting_periods.id'))
+            ->whereExists(fn($q) => $q->selectRaw('1')->from('personnel_snapshots')->whereColumn('reporting_period_id', 'reporting_periods.id'))
             ->update(['status' => 'ready']);
     }
 

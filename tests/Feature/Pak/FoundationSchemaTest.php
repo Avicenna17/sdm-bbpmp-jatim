@@ -37,49 +37,101 @@ class FoundationSchemaTest extends TestCase
     {
         $paths = glob(database_path('migrations/2026_10_17_*.php'));
         sort($paths);
+
         $sourcePaths = glob(database_path('migrations/2026_10_23_*.php'));
         sort($sourcePaths);
+
         $rulePaths = [
             database_path('migrations/2026_10_25_000100_create_performance_predicate_rules.php'),
             database_path('migrations/2026_10_25_000200_create_ak_coefficient_rules.php'),
         ];
+
         $conversionPaths = [
             database_path('migrations/2026_10_26_000100_create_pak_conversion_runs.php'),
             database_path('migrations/2026_10_26_000200_create_pak_conversion_periods.php'),
         ];
+
+        $evidencePaths = [
+            database_path('migrations/2026_11_21_000100_create_pak_case_evidences_table.php'),
+        ];
+
+        foreach (array_reverse($evidencePaths) as $path) {
+            (require $path)->down();
+        }
+
         foreach (array_reverse($conversionPaths) as $path) {
             (require $path)->down();
         }
+
         foreach (array_reverse($rulePaths) as $path) {
             (require $path)->down();
         }
+
         foreach (array_reverse($sourcePaths) as $path) {
             (require $path)->down();
         }
+
         foreach (array_reverse($paths) as $path) {
             (require $path)->down();
         }
+
         $db = DB::class;
-        $userId = $db::table('users')->insertGetId(['name' => 'Legacy', 'email' => 'legacy@example.test', 'password' => bcrypt('synthetic')]);
-        $personId = $db::table('people')->insertGetId(['person_key' => hash('sha256', 'legacy'), 'canonical_name' => 'Legacy Person', 'normalized_name' => 'LEGACY PERSON']);
-        $periodId = $db::table('reporting_periods')->insertGetId(['period_month' => '2025-01-01', 'status' => 'published', 'revision' => 1]);
+
+        $userId = $db::table('users')->insertGetId([
+            'name' => 'Legacy',
+            'email' => 'legacy@example.test',
+            'password' => bcrypt('synthetic'),
+        ]);
+
+        $personId = $db::table('people')->insertGetId([
+            'person_key' => hash('sha256', 'legacy'),
+            'canonical_name' => 'Legacy Person',
+            'normalized_name' => 'LEGACY PERSON',
+        ]);
+
+        $periodId = $db::table('reporting_periods')->insertGetId([
+            'period_month' => '2025-01-01',
+            'status' => 'published',
+            'revision' => 1,
+        ]);
+
         foreach ($paths as $path) {
             (require $path)->up();
         }
+
         foreach ($sourcePaths as $path) {
             (require $path)->up();
         }
+
         foreach ($rulePaths as $path) {
             (require $path)->up();
         }
+
         foreach ($conversionPaths as $path) {
             (require $path)->up();
         }
+
+        foreach ($evidencePaths as $path) {
+            (require $path)->up();
+        }
+
         $user = User::findOrFail($userId);
+
         $this->assertTrue($user->is_active);
         $this->assertNull($user->person_id);
-        $this->assertDatabaseHas('people', ['id' => $personId, 'canonical_name' => 'Legacy Person']);
-        $this->assertDatabaseHas('reporting_periods', ['id' => $periodId, 'status' => 'published', 'revision' => 1]);
+
+        $this->assertDatabaseHas('people', [
+            'id' => $personId,
+            'canonical_name' => 'Legacy Person',
+        ]);
+
+        $this->assertDatabaseHas('reporting_periods', [
+            'id' => $periodId,
+            'status' => 'published',
+            'revision' => 1,
+        ]);
+
         $this->assertDatabaseCount('pak_cases', 0);
+        $this->assertTrue(Schema::hasTable('pak_case_evidences'));
     }
 }
