@@ -99,6 +99,33 @@ Wajib mencakup kontrak Phase 02 yang applicable, termasuk:
 
 02D.1 production workbook adapter-dependent UAT tetap BLOCKED / DEFERRED sampai reopen condition terpenuhi. Synthetic adapter tidak menjadi bukti production workbook mapping.
 
+### Lane D formal closure — 28 November 2026
+
+**Status: PASS / CLOSED.**
+
+Current execution evidence:
+
+- mandatory UAT `TC-PAK-006` dan `TC-PAK-029–038`: PASS;
+- Private Evidence Manual UAT: PASS / CLOSED / FROZEN;
+- Trace Manual Inspection: PASS / CLOSED;
+- Safe Presentation Manual UAT: PASS / CLOSED / FROZEN;
+- Existing SDM Operations Smoke: PASS / CLOSED;
+- focused existing-SDM/workspace regression: 43 passed, 2 expected/environmental skips, 561 assertions, 0 failure/error;
+- isolated UAT schema setelah recovery: 31 migrations, latest batch 11, 4 users;
+- post-smoke state tetap `users=4`, `pak_cases=0`, `pak_conversion_runs=0`, `pak_case_evidences=0`, `pak_events=15`;
+- pre-edit repository clean, `git diff --check` clean, dan branch divergence `0 0`.
+
+Disposable UAT clone ter-reset selama rangkaian test-environment execution dan direcover dari verified binary-safe baseline backup. Exact mechanism reset tidak ditetapkan oleh closure ini. Development database tetap tidak berubah pada `23` migrations, latest batch `10`, dan `35` tables. Tidak terdapat evidence application defect dari incident tersebut.
+
+Carry-forward tidak berubah:
+
+- D1 / 02D.1 production workbook adapter tetap **BLOCKED / DEFERRED / NON-BLOCKING** dengan existing reopen conditions;
+- OD-07 / BR-SKP-008 tetap **BUSINESS PENDING / CARRY-FORWARD / NON-BLOCKING**; Phase 02 tidak melakukan automatic update/recalculation/replacement terhadap historical quarterly calculation ketika annual tersedia kemudian;
+- OD-08 tetap **DEFERRED**;
+- tidak ada business finalization, approval/penetapan AK, atau lifecycle baru yang diotorisasi oleh closure Lane D ini.
+
+Lane E belum dieksekusi oleh checkpoint ini.
+
 ## 7. Lane E — Final verification dan deployment
 
 Final result harus mencatat secara terpisah:
